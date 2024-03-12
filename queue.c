@@ -38,12 +38,12 @@ bool q_insert_head(struct list_head *head, char *s)
 {
     if (!head)
         return false;
-    element_t *entry = malloc(sizeof(element_t));
-    if (!entry)
+    element_t *elem = malloc(sizeof(element_t));
+    if (!elem)
         return false;
-    entry->value = strdup(s);
-    if (!entry->value) {
-        free(entry);
+    elem->value = strdup(s);
+    if (!elem->value) {
+        free(elem);
         return false;
     }
     /*
@@ -51,7 +51,7 @@ bool q_insert_head(struct list_head *head, char *s)
         entry->list: a (list_head node)
         so &(entry->list) is address of that (list_head node)
     */
-    list_add(&entry->list, head);
+    list_add(&elem->list, head);
 
     return true;
 }
@@ -59,38 +59,111 @@ bool q_insert_head(struct list_head *head, char *s)
 /* Insert an element at tail of queue */
 bool q_insert_tail(struct list_head *head, char *s)
 {
+    if (!head)
+        return false;
+    element_t *elem = malloc(sizeof(element_t));
+    if (!elem)
+        return false;
+    elem->value = strdup(s);
+    if (!elem->value) {
+        free(elem);
+        return false;
+    }
+    list_add_tail(&elem->list, head);
     return true;
 }
 
 /* Remove an element from head of queue */
 element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
 {
-    return NULL;
+    if (!head || list_empty(head))
+        return NULL;
+    element_t *elem = list_first_entry(head, element_t, list);
+    list_del(head->next);
+    if (sp && bufsize) {
+        strncpy(sp, elem->value, bufsize - 1);
+        sp[bufsize - 1] = '\0';
+    }
+    return elem;
 }
 
 /* Remove an element from tail of queue */
 element_t *q_remove_tail(struct list_head *head, char *sp, size_t bufsize)
 {
-    return NULL;
+    if (!head || list_empty(head))
+        return NULL;
+    element_t *elem = list_last_entry(head, element_t, list);
+    list_del(head->next);
+    if (sp && bufsize) {
+        strncpy(sp, elem->value, bufsize - 1);
+        sp[bufsize - 1] = '\0';
+    }
+    return elem;
 }
 
 /* Return number of elements in queue */
 int q_size(struct list_head *head)
 {
-    return -1;
+    if (!head)
+        return 0;
+    struct list_head *node;
+    int ret = 0;
+    list_for_each (node, head)
+        ret++;
+    return ret;
 }
 
 /* Delete the middle node in queue */
 bool q_delete_mid(struct list_head *head)
 {
     // https://leetcode.com/problems/delete-the-middle-node-of-a-linked-list/
+
+    if (!head || list_empty(head))
+        return false;
+    struct list_head *fast = head->next;
+    struct list_head *slow = head->next;
+    while (fast->next != head && fast->next->next != head) {
+        fast = fast->next->next;
+        slow = slow->next;
+    }
+    element_t *mid = list_entry(slow, element_t, list);
+    list_del(slow);
+    q_release_element(mid);
+
     return true;
 }
 
+
+#define list_for_specific_entry_safe(entry, safe, head, start_node, member) \
+    for (entry = list_entry(start_node, __typeof__(*entry), member),        \
+        safe = list_entry(entry->member.next, __typeof__(*entry), member);  \
+         &entry->member != (head); entry = safe,                            \
+        safe = list_entry(safe->member.next, __typeof__(*entry), member))
 /* Delete all nodes that have duplicate string */
 bool q_delete_dup(struct list_head *head)
 {
     // https://leetcode.com/problems/remove-duplicates-from-sorted-list-ii/
+    if (!head)
+        return false;
+    element_t *entry, *safe;
+    element_t *entry_inner, *safe_inner;
+    list_for_each_entry_safe (entry, safe, head, list) {
+        list_for_specific_entry_safe(entry_inner, safe_inner, head, &safe->list,
+                                     list)
+        {
+            bool dup = false;
+            if (!strcmp(entry->value, entry_inner->value)) {
+                list_del(&entry_inner->list);
+                q_release_element(entry_inner);
+                dup = true;
+            }
+            if (dup) {
+                list_del(&entry->list);
+                q_release_element(entry);
+            }
+        }
+    }
+
     return true;
 }
 
