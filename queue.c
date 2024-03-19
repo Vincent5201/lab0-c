@@ -52,7 +52,6 @@ bool q_insert_head(struct list_head *head, char *s)
         so &(entry->list) is address of that (list_head node)
     */
     list_add(&elem->list, head);
-
     return true;
 }
 
@@ -93,7 +92,7 @@ element_t *q_remove_tail(struct list_head *head, char *sp, size_t bufsize)
     if (!head || list_empty(head))
         return NULL;
     element_t *elem = list_last_entry(head, element_t, list);
-    list_del(head->next);
+    list_del(head->prev);
     if (sp && bufsize) {
         strncpy(sp, elem->value, bufsize - 1);
         sp[bufsize - 1] = '\0';
@@ -113,32 +112,39 @@ int q_size(struct list_head *head)
     return ret;
 }
 
-/* Delete the middle node in queue */
-bool q_delete_mid(struct list_head *head)
+/* Find the middle node in queue*/
+struct list_head *q_find_mid(struct list_head *head)
 {
-    // https://leetcode.com/problems/delete-the-middle-node-of-a-linked-list/
-
     if (!head || list_empty(head))
-        return false;
+        return NULL;
     struct list_head *fast = head->next;
     struct list_head *slow = head->next;
     while (fast->next != head && fast->next->next != head) {
         fast = fast->next->next;
         slow = slow->next;
     }
-    element_t *mid = list_entry(slow, element_t, list);
-    list_del(slow);
-    q_release_element(mid);
-
-    return true;
+    return slow;
 }
 
+/* Delete the middle node in queue */
+bool q_delete_mid(struct list_head *head)
+{
+    // https://leetcode.com/problems/delete-the-middle-node-of-a-linked-list/
+    if (!head || list_empty(head))
+        return false;
+    struct list_head *mid_head = q_find_mid(head);
+    element_t *mid = list_entry(mid_head, element_t, list);
+    list_del(mid_head);
+    q_release_element(mid);
+    return true;
+}
 
 #define list_for_specific_entry_safe(entry, safe, head, start_node, member) \
     for (entry = list_entry(start_node, __typeof__(*entry), member),        \
         safe = list_entry(entry->member.next, __typeof__(*entry), member);  \
          &entry->member != (head); entry = safe,                            \
         safe = list_entry(safe->member.next, __typeof__(*entry), member))
+
 /* Delete all nodes that have duplicate string */
 bool q_delete_dup(struct list_head *head)
 {
@@ -163,7 +169,6 @@ bool q_delete_dup(struct list_head *head)
             }
         }
     }
-
     return true;
 }
 
@@ -239,7 +244,36 @@ void q_reverseK(struct list_head *head, int k)
 }
 
 /* Sort elements of queue in ascending/descending order */
-void q_sort(struct list_head *head, bool descend) {}
+void q_sort(struct list_head *head, bool descend)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+    LIST_HEAD(head2);
+    list_cut_position(&head2, head, q_find_mid(head));
+    q_sort(head, descend);
+    q_sort(&head2, descend);
+    LIST_HEAD(head3);
+    while (!list_empty(head) && !list_empty(&head2)) {
+        element_t *elem1 = list_first_entry(head, element_t, list);
+        element_t *elem2 = list_first_entry(&head2, element_t, list);
+        if (descend) {
+            if (strcmp(elem1->value, elem2->value) > 0) {
+                list_move_tail(&elem1->list, &head3);
+            } else {
+                list_move_tail(&elem2->list, &head3);
+            }
+        } else {
+            if (strcmp(elem1->value, elem2->value) > 0) {
+                list_move_tail(&elem2->list, &head3);
+            } else {
+                list_move_tail(&elem1->list, &head3);
+            }
+        }
+    }
+    list_splice(&head3, head);
+    list_splice_tail(&head2, head);
+    return;
+}
 
 #define list_for_each_entry_safe_reverse(entry, safe, head, member)        \
     for (entry = list_entry((head)->prev, __typeof__(*entry), member),     \
@@ -260,9 +294,9 @@ int q_ascend(struct list_head *head)
     list_for_each_entry_safe_reverse(entry, safe, head, list)
     {
         if (value) {
-            if (*(entry->value) > *value) {
+            if (strcmp(entry->value, value) < 0) {
                 q_release_element(entry);
-            } else if (*(entry->value) < *value) {
+            } else {
                 value = entry->value;
             }
         } else {
@@ -284,9 +318,9 @@ int q_descend(struct list_head *head)
     list_for_each_entry_safe_reverse(entry, safe, head, list)
     {
         if (value) {
-            if (*(entry->value) < *value) {
+            if (strcmp(entry->value, value) < 0) {
                 q_release_element(entry);
-            } else if (*(entry->value) > *value) {
+            } else {
                 value = entry->value;
             }
         } else {
