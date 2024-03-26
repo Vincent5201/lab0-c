@@ -29,7 +29,6 @@ void q_free(struct list_head *head)
     element_t *entry, *safe;
     list_for_each_entry_safe (entry, safe, head, list)
         q_release_element(entry);
-
     free(head);
 }
 
@@ -134,12 +133,10 @@ bool q_delete_mid(struct list_head *head)
         return false;
     struct list_head *mid_head = q_find_mid(head);
     element_t *mid = list_entry(mid_head, element_t, list);
-    list_del(mid_head);
+    list_del_init(mid_head);
     q_release_element(mid);
     return true;
 }
-
-
 
 /* Delete all nodes that have duplicate string */
 bool q_delete_dup(struct list_head *head)
@@ -147,16 +144,23 @@ bool q_delete_dup(struct list_head *head)
     // https://leetcode.com/problems/remove-duplicates-from-sorted-list-ii/
     if (!head)
         return false;
-    element_t *entry, *safe;
+    struct list_head *node;
     bool dup = false;
-    list_for_each_entry_safe (entry, safe, head, list) {
-        if (!strcmp(entry->value, safe->value)) {
-            list_del(&entry->list);
-            q_release_element(entry);
+    list_for_each (node, head) {
+        struct list_head *test = node->next;
+        while (test != head &&
+               strcmp(list_entry(node, element_t, list)->value,
+                      list_entry(test, element_t, list)->value) == 0) {
             dup = true;
-        } else if (dup) {
-            list_del(&entry->list);
-            q_release_element(entry);
+            list_del(test);
+            q_release_element(list_entry(test, element_t, list));
+            test = node->next;
+        }
+        if (dup) {
+            test = node;
+            node = node->prev;
+            list_del_init(test);
+            q_release_element(list_entry(test, element_t, list));
             dup = false;
         }
     }
@@ -202,9 +206,7 @@ void q_reverseK(struct list_head *head, int k)
     if (!head || list_empty(head) || list_is_singular(head))
         return;
     int count = 0;
-    struct list_head *node;
-    struct list_head *safe;
-    struct list_head *head_p = head;
+    struct list_head *node, *safe, *head_p = head;
     list_for_each_safe (node, safe, head) {
         count++;
         if (!(count % k)) {
@@ -247,7 +249,6 @@ void q_merge2(struct list_head *first, struct list_head *second, bool descend)
     }
     list_splice(&head3, first);
     list_splice_tail(second, first);
-
     return;
 }
 
@@ -264,23 +265,6 @@ void q_sort(struct list_head *head, bool descend)
     return;
 }
 
-/**
- * list_for_each_entry_safe_reverse - Iterate over list entries from tail and
- * allow deletes
- * @entry: pointer used as iterator
- * @safe: @type pointer used to store info for next entry in list
- * @head: pointer to the head of the list
- * @member: name of the list_head member variable in struct type of @entry
- *
- * The current node (iterator) is allowed to be removed from the list. Any
- * other modifications to the the list will cause undefined behavior.
- */
-#define list_for_each_entry_safe_reverse(entry, safe, head, member)        \
-    for (entry = list_entry((head)->prev, __typeof__(*entry), member),     \
-        safe = list_entry(entry->member.prev, __typeof__(*entry), member); \
-         &entry->member != (head); entry = safe,                           \
-        safe = list_entry(safe->member.prev, __typeof__(*entry), member))
-
 /* Remove every node which has a node with a strictly less value anywhere to
  * the right side of it */
 int q_ascend(struct list_head *head)
@@ -289,13 +273,12 @@ int q_ascend(struct list_head *head)
     if (!head || list_empty(head) || list_is_singular(head))
         return q_size(head);
     element_t *entry, *safe;
-    list_for_each_entry_safe_reverse(entry, safe, head, list)
-    {
+    list_for_each_entry_safe (entry, safe, head, list) {
         for (struct list_head *node = &safe->list; node != head;
              node = node->next) {
             if (strcmp(list_entry(node, element_t, list)->value,
                        entry->value) <= 0) {
-                list_del(&entry->list);
+                list_del_init(&entry->list);
                 q_release_element(entry);
                 break;
             }
@@ -312,13 +295,12 @@ int q_descend(struct list_head *head)
     if (!head || list_empty(head) || list_is_singular(head))
         return q_size(head);
     element_t *entry, *safe;
-    list_for_each_entry_safe_reverse(entry, safe, head, list)
-    {
+    list_for_each_entry_safe (entry, safe, head, list) {
         for (struct list_head *node = &safe->list; node != head;
              node = node->next) {
             if (strcmp(list_entry(node, element_t, list)->value,
                        entry->value) >= 0) {
-                list_del(&entry->list);
+                list_del_init(&entry->list);
                 q_release_element(entry);
                 break;
             }
@@ -332,9 +314,6 @@ int q_descend(struct list_head *head)
 int q_merge(struct list_head *head, bool descend)
 {
     // https://leetcode.com/problems/merge-k-sorted-lists/
-    /* Had no idea why "INIT_LIST_HEAD(second->q);" is needed
-       Oherwise will have "ERROR: Freed queue, but 2 blocks are still allocated"
-    */
     if (!head || list_empty(head))
         return 0;
     if (list_is_singular(head))
