@@ -330,3 +330,113 @@ int q_merge(struct list_head *head, bool descend)
     }
     return q_size(head);
 }
+
+static struct list_head *k_merge(struct list_head *a, struct list_head *b)
+{
+    struct list_head *head = NULL, **tail = &head;
+    for (;;) {
+        /* if equal, take 'a' -- important for sort stability */
+        if (strcmp(container_of(a, element_t, list)->value,
+                   container_of(b, element_t, list)->value) <= 0) {
+            *tail = a;
+            tail = &a->next;
+            a = a->next;
+            if (!a) {
+                *tail = b;
+                break;
+            }
+        } else {
+            *tail = b;
+            tail = &b->next;
+            b = b->next;
+            if (!b) {
+                *tail = a;
+                break;
+            }
+        }
+    }
+    return head;
+}
+
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+static void k_merge_final(struct list_head *head,
+                          struct list_head *a,
+                          struct list_head *b)
+{
+    struct list_head *tail = head;
+    for (;;) {
+        /* if equal, take 'a' -- important for sort stability */
+        if (strcmp(container_of(a, element_t, list)->value,
+                   container_of(b, element_t, list)->value) <= 0) {
+            tail->next = a;
+            a->prev = tail;
+            tail = a;
+            a = a->next;
+            if (!a)
+                break;
+        } else {
+            tail->next = b;
+            b->prev = tail;
+            tail = b;
+            b = b->next;
+            if (!b) {
+                b = a;
+                break;
+            }
+        }
+    }
+    /* Finish linking remainder of list b on to tail */
+    tail->next = b;
+    do {
+        b->prev = tail;
+        tail = b;
+        b = b->next;
+    } while (b);
+    /* And the final links to make a circular doubly-linked list */
+    tail->next = head;
+    head->prev = tail;
+}
+
+void k_sort(struct list_head *head)
+{
+    struct list_head *list = head->next, *pending = NULL;
+    size_t count = 0;
+    if (list == head->prev)
+        return;
+    /* Convert to a null-terminated singly-linked list. */
+    head->prev->next = NULL;
+    do {
+        size_t bits;
+        struct list_head **tail = &pending;
+        /* Find the least-significant clear bit in count */
+        for (bits = count; bits & 1; bits >>= 1)
+            tail = &(*tail)->prev;
+        /* Do the indicated merge */
+        if (likely(bits)) {
+            struct list_head *a = *tail, *b = a->prev;
+            a = k_merge(b, a);
+            /* Install the merged result in place of the inputs */
+            a->prev = b->prev;
+            *tail = a;
+        }
+        /* Move one element from input list to pending */
+        list->prev = pending;
+        pending = list;
+        list = list->next;
+        pending->next = NULL;
+        count++;
+    } while (list);
+    /* End of input; merge together all the pending lists. */
+    list = pending;
+    pending = pending->prev;
+    for (;;) {
+        struct list_head *next = pending->prev;
+        if (!next)
+            break;
+        list = k_merge(pending, list);
+        pending = next;
+    }
+    /* The final merge, rebuilding prev links */
+    k_merge_final(head, pending, list);
+}

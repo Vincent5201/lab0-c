@@ -42,9 +42,8 @@ extern int show_entropy;
  * OK as long as head field of queue_t structure is in first position in
  * solution code
  */
-#include "queue.h"
-
 #include "console.h"
+#include "queue.h"
 #include "report.h"
 
 /* Settable parameters */
@@ -74,6 +73,8 @@ static int fail_count = 0;
 static int string_length = MAXSTRING;
 
 static int descend = 0;
+
+static int use_linux_list_sort = 0;
 
 #define MIN_RANDSTR_LEN 5
 #define MAX_RANDSTR_LEN 10
@@ -579,6 +580,8 @@ static bool do_size(int argc, char *argv[])
     return ok && !error_check();
 }
 
+void k_sort(struct list_head *head);
+
 bool do_sort(int argc, char *argv[])
 {
     if (argc != 1) {
@@ -598,8 +601,13 @@ bool do_sort(int argc, char *argv[])
     error_check();
 
     set_noallocate_mode(true);
-    if (current && exception_setup(true))
-        q_sort(current->q, descend);
+    if (current && exception_setup(true)) {
+        if (use_linux_list_sort) {
+            k_sort(current->q);
+        } else {
+            q_sort(current->q, descend);
+        }
+    }
     exception_cancel();
     set_noallocate_mode(false);
 
@@ -1060,6 +1068,7 @@ static void console_init()
               "Number of times allow queue operations to return false", NULL);
     add_param("descend", &descend,
               "Sort and merge queue in ascending/descending order", NULL);
+    add_param("linux_sort", &use_linux_list_sort, "Use linux list sort", NULL);
 }
 
 /* Signal handlers */
