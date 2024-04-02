@@ -473,6 +473,7 @@ void Timsort(struct list_head *head)
         return;
     }
     bool add = false;
+    /* decide minrun */
     while (size >= 64) {
         if (size & 1)
             add = true;
@@ -480,27 +481,116 @@ void Timsort(struct list_head *head)
     }
     if (add)
         size++;
-    struct list_head *list = head->next, *pending = NULL;
+    /* put 1 node */
+    struct list_head *lists = head->next, *pending = NULL;
     head->prev->next = NULL;
-
-    list->prev = pending;
-    pending = list;
-    list = list->next;
-    int tail_count = 1;
+    lists->prev = pending;
+    pending = lists;
+    lists = lists->next;
+    int tail_count = 1, run_count = 1;
     struct list_head *tail = pending;
     do {
-        struct list_head *node = list;
-        list = list->next;
+        /* take one node */
+        struct list_head *node = lists;
+        lists = lists->next;
+        node->next = NULL;
         if (strcmp(container_of(node, element_t, list)->value,
                    container_of(tail, element_t, list)->value) >= 0) {
-            tail->next = node;
-            node->prev = tail;
+            /* add to tail */
+            q_connect(tail, node);
             tail = node;
             tail_count++;
         } else {
             if (tail_count > size) {
-                /* I don't understand when to merge */
+                if (run_count < 3) {
+                    /* new run */
+                    node->prev = pending;
+                    pending = node;
+                    tail = node;
+                    tail_count = 1;
+                    run_count++;
+                } else {
+                    /* merge run */
+                    struct list_head *z = pending;
+                    struct list_head *y = z->prev;
+                    struct list_head *x = y->prev;
+                    struct list_head *w = x->prev;
+                    while (x) {
+                        int sx = q_size(x) + 1;
+                        int sy = q_size(y) + 1;
+                        int sz = q_size(z) + 1;
+                        if (sy > sx && sy > sz) {
+                            if (sy > sx + sz) {
+                                if (sx > sz) {
+                                    pending = z;
+                                    z->prev = x;
+                                    x->prev = y;
+                                } else {
+                                    pending = x;
+                                    x->prev = z;
+                                    z->prev = y;
+                                }
+                                y->prev = w;
+                                break;
+                            } else {
+                                z = k_merge(x, z);
+                                pending = y;
+                                y->prev = z;
+                                z->prev = w;
+                                run_count--;
+                            }
+                        } else if (sz > sy && sz > sx) {
+                            if (sz > sx + sy) {
+                                if (sx > sy) {
+                                    pending = y;
+                                    y->prev = x;
+                                    x->prev = z;
+                                } else {
+                                    pending = x;
+                                    x->prev = y;
+                                    y->prev = z;
+                                }
+                                z->prev = w;
+                                break;
+                            } else {
+                                y = k_merge(x, y);
+                                pending = z;
+                                z->prev = y;
+                                y->prev = w;
+                                run_count--;
+                            }
+                        } else {
+                            if (sx > sz + sy) {
+                                if (sz > sy) {
+                                    pending = y;
+                                    y->prev = z;
+                                    z->prev = x;
+                                }
+                                x->prev = w;
+                                break;
+                            } else {
+                                y = k_merge(z, y);
+                                pending = x;
+                                x->prev = y;
+                                y->prev = w;
+                                run_count--;
+                            }
+                        }
+                        z = pending;
+                        y = z->prev;
+                        x = y->prev;
+                        w = NULL;
+                        if (x)
+                            w = x->prev;
+                    }
+                    node->prev = pending;
+                    pending = node;
+                    tail = node;
+                    tail_count = 1;
+                    run_count++;
+                }
             } else {
+                /* add to tail and insertion sort */
                 struct list_head *pos_prev = tail, *pos_next = NULL;
                 while (strcmp(container_of(node, element_t, list)->value,
                               container_of(pos_prev, element_t, list)->value) <
@@ -510,33 +600,36 @@ void Timsort(struct list_head *head)
                         break;
                     pos_prev = pos_prev->prev;
                 }
+
                 if (pos_next == pos_prev) {
                     node->prev = pending->prev;
-                    node->next = pending;
-                    pending->prev = node;
+                    q_connect(node, pending);
                     pending = node;
-                    tail_count++;
                 } else {
-                    pos_prev->next = node;
-                    node->prev = pos_prev;
-                    node->next = pos_next;
-                    pos_next->prev = node;
-                    tail_count++;
+                    q_connect(pos_prev, node);
+                    q_connect(node, pos_next);
                 }
+                tail_count++;
             }
         }
-    } while (list);
-    /* End of input; merge together all the pending lists. */
-    list = pending;
+    } while (lists);
+    /* merge all*/
+    lists = pending;
     pending = pending->prev;
-    for (;;) {
-        struct list_head *next = pending->prev;
-        if (!next)
-            break;
-        list = k_merge(pending, list);
-        pending = next;
+    struct list_head *back = pending->prev;
+    while (back) {
+        lists = k_merge(pending, lists);
+        pending = back;
+        back = back->prev;
     }
-    /* The final merge, rebuilding prev links */
-    k_merge_final(head, pending, list);
-
+    head->next = k_merge(lists, pending);
+    /* link 'prev' back */
+    lists = head;
+    while (lists->next) {
+        lists->next->prev = lists;
+        lists = lists->next;
+    }
+    lists->next = head;
+    head->prev = lists;
+    return;
 }
