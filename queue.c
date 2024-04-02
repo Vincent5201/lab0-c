@@ -102,12 +102,14 @@ element_t *q_remove_tail(struct list_head *head, char *sp, size_t bufsize)
 /* Return number of elements in queue */
 int q_size(struct list_head *head)
 {
-    if (!head)
+    if (!head || list_empty(head))
         return 0;
-    struct list_head *node;
+    struct list_head *node = head->next;
     int ret = 0;
-    list_for_each (node, head)
+    while (node && node != head) {
         ret++;
+        node = node->next;
+    }
     return ret;
 }
 
@@ -398,13 +400,13 @@ static void k_merge_final(struct list_head *head,
     head->prev = tail;
 }
 
+/* Copird from lib/list_sort.c and modified */
 void k_sort(struct list_head *head)
 {
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
     struct list_head *list = head->next, *pending = NULL;
     size_t count = 0;
-    if (list == head->prev)
-        return;
-    /* Convert to a null-terminated singly-linked list. */
     head->prev->next = NULL;
     do {
         size_t bits;
@@ -439,4 +441,102 @@ void k_sort(struct list_head *head)
     }
     /* The final merge, rebuilding prev links */
     k_merge_final(head, pending, list);
+}
+
+/* Insertion Sort */
+void i_sort(struct list_head *head)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+    struct list_head *node, *safe;
+    list_for_each_safe (node, safe, head) {
+        struct list_head *back = node->prev;
+        list_del(node);
+        while (back != head &&
+               strcmp(container_of(node, element_t, list)->value,
+                      container_of(back, element_t, list)->value) <= 0)
+            back = back->prev;
+        struct list_head *next = back->next;
+        q_connect(back, node);
+        q_connect(node, next);
+    }
+    return;
+}
+
+void Timsort(struct list_head *head)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+    int size = q_size(head);
+    if (size < 64) {
+        i_sort(head);
+        return;
+    }
+    bool add = false;
+    while (size >= 64) {
+        if (size & 1)
+            add = true;
+        size = size >> 1;
+    }
+    if (add)
+        size++;
+    struct list_head *list = head->next, *pending = NULL;
+    head->prev->next = NULL;
+
+    list->prev = pending;
+    pending = list;
+    list = list->next;
+    int tail_count = 1;
+    struct list_head *tail = pending;
+    do {
+        struct list_head *node = list;
+        list = list->next;
+        if (strcmp(container_of(node, element_t, list)->value,
+                   container_of(tail, element_t, list)->value) >= 0) {
+            tail->next = node;
+            node->prev = tail;
+            tail = node;
+            tail_count++;
+        } else {
+            if (tail_count > size) {
+                /* I don't understand when to merge */
+            } else {
+                struct list_head *pos_prev = tail, *pos_next = NULL;
+                while (strcmp(container_of(node, element_t, list)->value,
+                              container_of(pos_prev, element_t, list)->value) <
+                       0) {
+                    pos_next = pos_prev;
+                    if (pos_prev == pending)
+                        break;
+                    pos_prev = pos_prev->prev;
+                }
+                if (pos_next == pos_prev) {
+                    node->prev = pending->prev;
+                    node->next = pending;
+                    pending->prev = node;
+                    pending = node;
+                    tail_count++;
+                } else {
+                    pos_prev->next = node;
+                    node->prev = pos_prev;
+                    node->next = pos_next;
+                    pos_next->prev = node;
+                    tail_count++;
+                }
+            }
+        }
+    } while (list);
+    /* End of input; merge together all the pending lists. */
+    list = pending;
+    pending = pending->prev;
+    for (;;) {
+        struct list_head *next = pending->prev;
+        if (!next)
+            break;
+        list = k_merge(pending, list);
+        pending = next;
+    }
+    /* The final merge, rebuilding prev links */
+    k_merge_final(head, pending, list);
+
 }

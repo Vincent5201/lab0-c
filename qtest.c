@@ -74,7 +74,7 @@ static int string_length = MAXSTRING;
 
 static int descend = 0;
 
-static int use_linux_list_sort = 0;
+static int select_sort = 0;
 
 #define MIN_RANDSTR_LEN 5
 #define MAX_RANDSTR_LEN 10
@@ -581,6 +581,7 @@ static bool do_size(int argc, char *argv[])
 }
 
 void k_sort(struct list_head *head);
+void Timsort(struct list_head *head);
 
 bool do_sort(int argc, char *argv[])
 {
@@ -602,10 +603,15 @@ bool do_sort(int argc, char *argv[])
 
     set_noallocate_mode(true);
     if (current && exception_setup(true)) {
-        if (use_linux_list_sort) {
+        switch (select_sort) {
+        case 1:
             k_sort(current->q);
-        } else {
+            break;
+        case 2:
+            Timsort(current->q);
+        default:
             q_sort(current->q, descend);
+            break;
         }
     }
     exception_cancel();
@@ -1068,7 +1074,7 @@ static void console_init()
               "Number of times allow queue operations to return false", NULL);
     add_param("descend", &descend,
               "Sort and merge queue in ascending/descending order", NULL);
-    add_param("linux_sort", &use_linux_list_sort, "Use linux list sort", NULL);
+    add_param("select_sort", &select_sort, "Use linux list sort", NULL);
 }
 
 /* Signal handlers */
