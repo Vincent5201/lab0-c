@@ -1,4 +1,4 @@
-option linux_sort 0
+option select_sort 2
 new
 it RAND 100000
 sort
