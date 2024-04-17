@@ -609,6 +609,7 @@ bool do_sort(int argc, char *argv[])
             break;
         case 2:
             Timsort(current->q);
+            break;
         default:
             q_sort(current->q, descend);
             break;

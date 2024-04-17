@@ -448,24 +448,31 @@ struct list_head *i_sort(struct list_head *head)
 {
     if (!head)
         return NULL;
-    struct list_head *lists = head->next;
+    struct list_head *tail = head, *lists = head->next;
     head->next = NULL;
     while (lists) {
-        struct list_head *node = head, *last_node = NULL;
-        while (node && strcmp(container_of(lists, element_t, list)->value,
-                              container_of(node, element_t, list)->value) > 0) {
-            last_node = node;
-            node = node->next;
-        }
-        if (last_node) {
+        if (strcmp(container_of(lists, element_t, list)->value,
+                   container_of(tail, element_t, list)->value) >= 0) {
+            tail->next = lists;
+            lists = lists->next;
+            tail = tail->next;
+            tail->next = NULL;
+        } else if (strcmp(container_of(lists, element_t, list)->value,
+                          container_of(head, element_t, list)->value) <= 0) {
+            struct list_head *node = lists;
+            lists = lists->next;
+            node->next = head;
+            head = node;
+        } else {
+            struct list_head *node = head->next, *last_node = head;
+            while (strcmp(container_of(lists, element_t, list)->value,
+                          container_of(node, element_t, list)->value) > 0) {
+                last_node = node;
+                node = node->next;
+            }
             last_node->next = lists;
             lists = lists->next;
             last_node->next->next = node;
-        } else {
-            last_node = lists;
-            lists = lists->next;
-            last_node->next = head;
-            head = last_node;
         }
     }
     return head;
@@ -475,7 +482,19 @@ void Timsort(struct list_head *head)
 {
     if (!head || list_empty(head) || list_is_singular(head))
         return;
-    int size = 32;
+    int size = q_size(head);
+    if (size < 64) {
+        i_sort(head);
+        return;
+    }
+    bool add = false;
+    while (size >= 64) {
+        if (size & 1)
+            add = true;
+        size = size >> 1;
+    }
+    if (add)
+        size++;
     /* put 1 node */
     struct list_head *lists = head->next, *pending = NULL;
     head->prev->next = NULL;
