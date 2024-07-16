@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "queue.h"
 
@@ -549,4 +550,41 @@ void Timsort(struct list_head *head)
     }
     /* The final merge, rebuilding prev links */
     k_merge_final(head, pending, lists);
+}
+
+void q_shuffle(struct list_head *head)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+    srand(time(NULL));
+    int len = q_size(head) - 1;
+    struct list_head *node, *swap;
+    node = head->next;
+    while (len) {
+        int random = rand() % len;
+        len--;
+        if (likely(random)) {
+            struct list_head *pprev, *nnext;
+            pprev = node->prev;
+            if (unlikely(random == 1)) {
+                swap = node->next;
+                nnext = swap->next;
+                q_connect(pprev, swap);
+                q_connect(swap, node);
+                q_connect(node, nnext);
+            } else {
+                swap = node;
+                while (random) {
+                    swap = swap->next;
+                    random--;
+                }
+                nnext = swap->next;
+                q_connect(swap, node->next);
+                q_connect(swap->prev, node);
+                q_connect(pprev, swap);
+                q_connect(node, nnext);
+                node = swap->next;
+            }
+        }
+    }
 }

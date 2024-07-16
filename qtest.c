@@ -890,6 +890,57 @@ static bool do_merge(int argc, char *argv[])
     return ok && !error_check();
 }
 
+void q_shuffle(struct list_head *head);
+
+static bool do_shuffle(int argc, char *argv[])
+{
+    if (argc != 1) {
+        report(1, "%s takes no arguments", argv[0]);
+        return false;
+    }
+
+    if (!current || !current->q) {
+        report(3, "Warning: Try to access null queue");
+        return false;
+    }
+    error_check();
+    set_noallocate_mode(true);
+    q_shuffle(current->q);
+    q_show(3);
+    set_noallocate_mode(false);
+    return !error_check();
+}
+
+/* "abcd" = 0, "abdc" = 1, etc. */
+int analyze_shuffle(struct list_head *head);
+
+/* need to */
+static bool do_analyze_shuffle(int argc, char *argv[])
+{
+    if (argc != 1) {
+        report(1, "%s takes no arguments", argv[0]);
+        return false;
+    }
+    error_check();
+
+    int count[24] = {0};
+    do_new(1, argv);
+    char *it_argv[3] = {"it", "a", "1"};
+    do_it(3, it_argv);
+    it_argv[1] = "b";
+    do_it(3, it_argv);
+    it_argv[1] = "c";
+    do_it(3, it_argv);
+    it_argv[1] = "d";
+    do_it(3, it_argv);
+    q_shuffle(current->q);
+    int tmp = analyze_shuffle(current->q);
+    count[tmp]++;
+    do_free(1, argv);
+
+    return !error_check();
+}
+
 static bool is_circular()
 {
     struct list_head *cur = current->q->next;
@@ -1067,6 +1118,8 @@ static void console_init()
                 "");
     ADD_COMMAND(reverseK, "Reverse the nodes of the queue 'K' at a time",
                 "[K]");
+    ADD_COMMAND(shuffle, "Shuffle nodes.", "");
+    ADD_COMMAND(analyze_shuffle, "Analyze_shuffle on 'abc'.", "");
     add_param("length", &string_length, "Maximum length of displayed string",
               NULL);
     add_param("malloc", &fail_probability, "Malloc failure probability percent",
