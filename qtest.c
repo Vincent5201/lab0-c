@@ -912,7 +912,10 @@ static bool do_shuffle(int argc, char *argv[])
 }
 
 /* "abcd" = 0, "abdc" = 1, etc. */
-int analyze_shuffle(struct list_head *head);
+int analyze_shuffle(struct list_head *head)
+{
+    return 0;
+}
 
 /* need to */
 static bool do_analyze_shuffle(int argc, char *argv[])
