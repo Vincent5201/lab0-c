@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "random.h"
 
 #include "queue.h"
 
@@ -552,39 +553,32 @@ void Timsort(struct list_head *head)
     k_merge_final(head, pending, lists);
 }
 
+uint64_t qrandom()
+{
+    uint64_t tmp;
+    randombytes((uint8_t *) &tmp, sizeof(tmp));
+    return tmp;
+}
+
 void q_shuffle(struct list_head *head)
 {
     if (!head || list_empty(head) || list_is_singular(head))
         return;
     srand(time(NULL));
-    int len = q_size(head) - 1;
-    struct list_head *node, *swap;
-    node = head->next;
-    while (len) {
-        int random = rand() % len;
-        len--;
-        if (likely(random)) {
-            struct list_head *pprev, *nnext;
-            pprev = node->prev;
-            if (unlikely(random == 1)) {
-                swap = node->next;
-                nnext = swap->next;
-                q_connect(pprev, swap);
-                q_connect(swap, node);
-                q_connect(node, nnext);
-            } else {
-                swap = node;
-                while (random) {
-                    swap = swap->next;
-                    random--;
-                }
-                nnext = swap->next;
-                q_connect(swap, node->next);
-                q_connect(swap->prev, node);
-                q_connect(pprev, swap);
-                q_connect(node, nnext);
-                node = swap->next;
-            }
-        }
+    int len = q_size(head);
+    struct list_head **entries = malloc(sizeof(*entries) * len);
+    struct list_head *node;
+    int i = 0;
+    list_for_each (node, head)
+        entries[i++] = node;
+    for (i = len - 1; i > 0; i--) {
+        int n = qrandom() % (i + 1);
+        struct list_head *tmp = entries[i];
+        entries[i] = entries[n];
+        entries[n] = tmp;
     }
+    INIT_LIST_HEAD(head);
+    for (i = 0; i < len; i++)
+        list_add_tail(entries[i], head);
+    free(entries);
 }

@@ -76,6 +76,8 @@ static int descend = 0;
 
 static int select_sort = 0;
 
+static bool not_show = false;
+
 #define MIN_RANDSTR_LEN 5
 #define MAX_RANDSTR_LEN 10
 static const char charset[] = "abcdefghijklmnopqrstuvwxyz";
@@ -911,13 +913,22 @@ static bool do_shuffle(int argc, char *argv[])
     return !error_check();
 }
 
-/* "abcd" = 0, "abdc" = 1, etc. */
-int analyze_shuffle(struct list_head *head)
+/* test and find a way to let 24 values be unique */
+int get_hash(struct list_head *head)
 {
-    return 0;
+    int w = 1, v = 0;
+    element_t *entry;
+    list_for_each_entry (entry, head, list) {
+        v += (entry->value[0] - 'a') * w;
+        w *= 5;
+    }
+    v %= 39;
+    return v;
 }
 
-/* need to */
+/* 41791 42282 41962 42162 41751 42173 41854 41945
+42304 42183 42035 42420 41879 42103 41930 41752
+42023 41806 41948 41878 42186 42289 42300 42044 */
 static bool do_analyze_shuffle(int argc, char *argv[])
 {
     if (argc != 1) {
@@ -925,22 +936,28 @@ static bool do_analyze_shuffle(int argc, char *argv[])
         return false;
     }
     error_check();
-
-    int count[24] = {0};
-    do_new(1, argv);
-    char *it_argv[3] = {"it", "a", "1"};
-    do_it(3, it_argv);
-    it_argv[1] = "b";
-    do_it(3, it_argv);
-    it_argv[1] = "c";
-    do_it(3, it_argv);
-    it_argv[1] = "d";
-    do_it(3, it_argv);
-    q_shuffle(current->q);
-    int tmp = analyze_shuffle(current->q);
-    count[tmp]++;
-    do_free(1, argv);
-
+    not_show = true;
+    int count[39] = {0};
+    for (int i = 0; i < 1009000; i++) {
+        do_new(1, argv);
+        char *it_argv[3] = {"it", "a", "1"};
+        do_it(3, it_argv);
+        it_argv[1] = "b";
+        do_it(3, it_argv);
+        it_argv[1] = "c";
+        do_it(3, it_argv);
+        it_argv[1] = "d";
+        do_it(3, it_argv);
+        q_shuffle(current->q);
+        count[get_hash(current->q)]++;
+        do_free(1, argv);
+    }
+    not_show = false;
+    for (int i = 0; i < 39; i++) {
+        if (count[i])
+            printf("%d ", count[i]);
+    }
+    printf("\n");
     return !error_check();
 }
 
@@ -964,6 +981,8 @@ static bool is_circular()
 
 static bool q_show(int vlevel)
 {
+    if (not_show)
+        return true;
     bool ok = true;
     if (verblevel < vlevel)
         return true;
