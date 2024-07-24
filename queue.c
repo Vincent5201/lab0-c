@@ -137,7 +137,7 @@ bool q_delete_mid(struct list_head *head)
         return false;
     struct list_head *mid_head = q_find_mid(head);
     element_t *mid = list_entry(mid_head, element_t, list);
-    list_del_init(mid_head);
+    list_del(mid_head);
     q_release_element(mid);
     return true;
 }
@@ -163,7 +163,7 @@ bool q_delete_dup(struct list_head *head)
         if (dup) {
             test = node;
             node = node->prev;
-            list_del_init(test);
+            list_del(test);
             q_release_element(list_entry(test, element_t, list));
             dup = false;
         }
@@ -282,7 +282,7 @@ int q_ascend(struct list_head *head)
              node = node->next) {
             if (strcmp(list_entry(node, element_t, list)->value,
                        entry->value) <= 0) {
-                list_del_init(&entry->list);
+                list_del(&entry->list);
                 q_release_element(entry);
                 break;
             }
@@ -304,7 +304,7 @@ int q_descend(struct list_head *head)
              node = node->next) {
             if (strcmp(list_entry(node, element_t, list)->value,
                        entry->value) >= 0) {
-                list_del_init(&entry->list);
+                list_del(&entry->list);
                 q_release_element(entry);
                 break;
             }

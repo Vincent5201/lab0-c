@@ -926,9 +926,6 @@ int get_hash(struct list_head *head)
     return v;
 }
 
-/* 41791 42282 41962 42162 41751 42173 41854 41945
-42304 42183 42035 42420 41879 42103 41930 41752
-42023 41806 41948 41878 42186 42289 42300 42044 */
 static bool do_analyze_shuffle(int argc, char *argv[])
 {
     if (argc != 1) {
@@ -938,7 +935,7 @@ static bool do_analyze_shuffle(int argc, char *argv[])
     error_check();
     not_show = true;
     int count[39] = {0};
-    for (int i = 0; i < 1009000; i++) {
+    for (int i = 0; i < 1000000; i++) {
         do_new(1, argv);
         char *it_argv[3] = {"it", "a", "1"};
         do_it(3, it_argv);
