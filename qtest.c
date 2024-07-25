@@ -581,9 +581,11 @@ static bool do_size(int argc, char *argv[])
 
     return ok && !error_check();
 }
-
+/* linux_kernel's lib/list_sort.c*/
 void k_sort(struct list_head *head);
-void Timsort(struct list_head *head);
+
+/* insertion sort + k_sort */
+void h_sort(struct list_head *head);
 
 bool do_sort(int argc, char *argv[])
 {
@@ -610,7 +612,7 @@ bool do_sort(int argc, char *argv[])
             k_sort(current->q);
             break;
         case 2:
-            Timsort(current->q);
+            h_sort(current->q);
             break;
         default:
             q_sort(current->q, descend);

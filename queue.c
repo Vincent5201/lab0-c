@@ -480,7 +480,7 @@ struct list_head *i_sort(struct list_head *head)
     return head;
 }
 
-void Timsort(struct list_head *head)
+void h_sort(struct list_head *head)
 {
     if (!head || list_empty(head) || list_is_singular(head))
         return;
