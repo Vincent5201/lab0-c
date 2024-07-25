@@ -587,6 +587,9 @@ void k_sort(struct list_head *head);
 /* insertion sort + k_sort */
 void h_sort(struct list_head *head);
 
+/* Timsort */
+void t_sort(struct list_head *head);
+
 bool do_sort(int argc, char *argv[])
 {
     if (argc != 1) {
@@ -613,6 +616,9 @@ bool do_sort(int argc, char *argv[])
             break;
         case 2:
             h_sort(current->q);
+            break;
+        case 3:
+            t_sort(current->q);
             break;
         default:
             q_sort(current->q, descend);
