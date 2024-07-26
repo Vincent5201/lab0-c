@@ -462,10 +462,10 @@ void k_sort(struct list_head *head)
 }
 
 /* Insertion Sort */
-struct list_head *i_sort(struct list_head *head)
+void i_sort(struct list_head *head)
 {
     if (!head)
-        return NULL;
+        return;
     struct list_head *tail = head, *lists = head->next;
     head->next = NULL;
     while (lists) {
@@ -493,7 +493,6 @@ struct list_head *i_sort(struct list_head *head)
             last_node->next->next = node;
         }
     }
-    return head;
 }
 
 void h_sort(struct list_head *head)
@@ -503,6 +502,11 @@ void h_sort(struct list_head *head)
     int size = q_size(head);
     if (size < 64) {
         i_sort(head);
+        struct list_head *node = head;
+        while (node->next) {
+            node->next->prev = node;
+            node = node->next;
+        }
         return;
     }
     bool add = false;
@@ -526,7 +530,7 @@ void h_sort(struct list_head *head)
         if (unlikely(tail_count == size)) {
             /* insertion sort */
             struct list_head *tmp = pending->prev;
-            pending = i_sort(pending);
+            i_sort(pending);
             pending->prev = tmp;
             /* merge */
             run_count++;
