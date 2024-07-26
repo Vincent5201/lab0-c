@@ -407,18 +407,10 @@ static void k_merge_final(struct list_head *head,
         }
     }
     /* Finish linking remainder of list b on to tail */
-    tail->next = b;
-    do {
-        b->prev = tail;
-        tail = b;
-        b = b->next;
-    } while (b);
-    /* And the final links to make a circular doubly-linked list */
-    tail->next = head;
-    head->prev = tail;
+    build_prev_link(head, tail, b);
 }
 
-/* Copird from lib/list_sort.c and modified */
+/* Copird from lib/list_sort.c then modify it */
 void k_sort(struct list_head *head)
 {
     if (!head || list_empty(head) || list_is_singular(head))
@@ -462,13 +454,11 @@ void k_sort(struct list_head *head)
 }
 
 /* Insertion Sort */
-void i_sort(struct list_head *head)
+struct list_head *i_sort(struct list_head *head)
 {
-    if (!head)
-        return;
     struct list_head *tail = head, *lists = head->next;
     head->next = NULL;
-    while (lists) {
+    while (lists && lists != head) {
         if (strcmp(container_of(lists, element_t, list)->value,
                    container_of(tail, element_t, list)->value) >= 0) {
             tail->next = lists;
@@ -493,6 +483,7 @@ void i_sort(struct list_head *head)
             last_node->next->next = node;
         }
     }
+    return head;
 }
 
 void h_sort(struct list_head *head)
@@ -501,12 +492,15 @@ void h_sort(struct list_head *head)
         return;
     int size = q_size(head);
     if (size < 64) {
-        i_sort(head);
-        struct list_head *node = head;
-        while (node->next) {
+        struct list_head *node = head->next;
+        head->prev->next = NULL;
+        node = i_sort(node);
+        q_connect(head, node);
+        while (node->next && node->next != head) {
             node->next->prev = node;
             node = node->next;
         }
+        q_connect(node, head);
         return;
     }
     bool add = false;
@@ -530,7 +524,7 @@ void h_sort(struct list_head *head)
         if (unlikely(tail_count == size)) {
             /* insertion sort */
             struct list_head *tmp = pending->prev;
-            i_sort(pending);
+            pending = i_sort(pending);
             pending->prev = tmp;
             /* merge */
             run_count++;
