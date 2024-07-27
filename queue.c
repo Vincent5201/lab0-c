@@ -492,6 +492,7 @@ void h_sort(struct list_head *head)
         return;
     int size = q_size(head);
     if (size < 64) {
+        /* insertion sort */
         struct list_head *node = head->next;
         head->prev->next = NULL;
         node = i_sort(node);
@@ -503,6 +504,7 @@ void h_sort(struct list_head *head)
         q_connect(node, head);
         return;
     }
+    /* set run size */
     bool add = false;
     while (size >= 64) {
         if (size & 1)
@@ -517,15 +519,11 @@ void h_sort(struct list_head *head)
     lists->prev = pending;
     pending = lists;
     lists = lists->next;
+    pending->next = NULL;
     int tail_count = 1, run_count = 0;
-    struct list_head *tail = pending;
     do {
         /* take one node */
         if (unlikely(tail_count == size)) {
-            /* insertion sort */
-            struct list_head *tmp = pending->prev;
-            pending = i_sort(pending);
-            pending->prev = tmp;
             /* merge */
             run_count++;
             size_t bits;
@@ -542,15 +540,29 @@ void h_sort(struct list_head *head)
             pending = lists;
             lists = lists->next;
             pending->next = NULL;
-            tail = pending;
             tail_count = 1;
         } else {
             /* add to tail */
-            tail->next = lists;
-            tail = lists;
+            struct list_head *tmp = lists;
             lists = lists->next;
-            tail->next = NULL;
             tail_count++;
+            if (strcmp(container_of(tmp, element_t, list)->value,
+                       container_of(pending, element_t, list)->value) < 0) {
+                tmp->next = pending;
+                tmp->prev = pending->prev;
+                pending->prev = tmp;
+                pending = tmp;
+            } else {
+                struct list_head *pos = pending->next, *last_pos = pending;
+                while (pos &&
+                       strcmp(container_of(pos, element_t, list)->value,
+                              container_of(tmp, element_t, list)->value) < 0) {
+                    last_pos = pos;
+                    pos = pos->next;
+                }
+                last_pos->next = tmp;
+                tmp->next = pos;
+            }
         }
     } while (lists);
     /* merge all*/
@@ -565,6 +577,7 @@ void h_sort(struct list_head *head)
     }
     /* The final merge, rebuilding prev links */
     k_merge_final(head, pending, lists);
+
 }
 
 static inline size_t run_size(struct list_head *head)
