@@ -172,10 +172,8 @@ bool q_delete_dup(struct list_head *head)
 }
 
 /* Connect two list_heads. */
-void q_connect(struct list_head *first, struct list_head *second)
+void inline q_connect(struct list_head *first, struct list_head *second)
 {
-    if (!first || !second)
-        return;
     first->next = second;
     second->prev = first;
     return;
@@ -335,13 +333,17 @@ int q_merge(struct list_head *head, bool descend)
     return q_size(head);
 }
 
+#define cmp_element_t_val(a, b)                     \
+    strcmp(container_of(a, element_t, list)->value, \
+           container_of(b, element_t, list)->value)
+
+
 static struct list_head *k_merge(struct list_head *a, struct list_head *b)
 {
     struct list_head *head = NULL, **tail = &head;
     for (;;) {
         /* if equal, take 'a' -- important for sort stability */
-        if (strcmp(container_of(a, element_t, list)->value,
-                   container_of(b, element_t, list)->value) <= 0) {
+        if (cmp_element_t_val(a, b) <= 0) {
             *tail = a;
             tail = &a->next;
             a = a->next;
@@ -372,10 +374,7 @@ static void build_prev_link(struct list_head *head,
         tail = list;
         list = list->next;
     } while (list);
-
-    /* The final links to make a circular doubly-linked list */
-    tail->next = head;
-    head->prev = tail;
+    q_connect(tail, head);
 }
 
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -387,17 +386,14 @@ static void k_merge_final(struct list_head *head,
     struct list_head *tail = head;
     for (;;) {
         /* if equal, take 'a' -- important for sort stability */
-        if (strcmp(container_of(a, element_t, list)->value,
-                   container_of(b, element_t, list)->value) <= 0) {
-            tail->next = a;
-            a->prev = tail;
+        if (cmp_element_t_val(a, b) <= 0) {
+            q_connect(tail, a);
             tail = a;
             a = a->next;
             if (!a)
                 break;
         } else {
-            tail->next = b;
-            b->prev = tail;
+            q_connect(tail, b);
             tail = b;
             b = b->next;
             if (!b) {
@@ -458,23 +454,21 @@ struct list_head *i_sort(struct list_head *head)
 {
     struct list_head *tail = head, *lists = head->next;
     head->next = NULL;
+
     while (lists && lists != head) {
-        if (strcmp(container_of(lists, element_t, list)->value,
-                   container_of(tail, element_t, list)->value) >= 0) {
+        if (cmp_element_t_val(lists, tail) >= 0) {
             tail->next = lists;
             lists = lists->next;
             tail = tail->next;
             tail->next = NULL;
-        } else if (strcmp(container_of(lists, element_t, list)->value,
-                          container_of(head, element_t, list)->value) <= 0) {
+        } else if (cmp_element_t_val(lists, head) <= 0) {
             struct list_head *node = lists;
             lists = lists->next;
             node->next = head;
             head = node;
         } else {
             struct list_head *node = head->next, *last_node = head;
-            while (strcmp(container_of(lists, element_t, list)->value,
-                          container_of(node, element_t, list)->value) > 0) {
+            while (cmp_element_t_val(lists, node) > 0) {
                 last_node = node;
                 node = node->next;
             }
@@ -546,17 +540,14 @@ void h_sort(struct list_head *head)
             struct list_head *tmp = lists;
             lists = lists->next;
             tail_count++;
-            if (strcmp(container_of(tmp, element_t, list)->value,
-                       container_of(pending, element_t, list)->value) < 0) {
+            if (cmp_element_t_val(tmp, pending) < 0) {
                 tmp->next = pending;
                 tmp->prev = pending->prev;
                 pending->prev = tmp;
                 pending = tmp;
             } else {
                 struct list_head *pos = pending->next, *last_pos = pending;
-                while (pos &&
-                       strcmp(container_of(pos, element_t, list)->value,
-                              container_of(tmp, element_t, list)->value) < 0) {
+                while (pos && cmp_element_t_val(pos, tmp) < 0) {
                     last_pos = pos;
                     pos = pos->next;
                 }
@@ -606,8 +597,7 @@ static struct pair find_run(struct list_head *list)
         return result;
     }
 
-    if (strcmp(container_of(list, element_t, list)->value,
-               container_of(next, element_t, list)->value) > 0) {
+    if (cmp_element_t_val(list, next) > 0) {
         /* decending run, also reverse the list */
         struct list_head *prev = NULL;
         do {
@@ -617,18 +607,14 @@ static struct pair find_run(struct list_head *list)
             list = next;
             next = list->next;
             head = list;
-        } while (next &&
-                 strcmp(container_of(list, element_t, list)->value,
-                        container_of(next, element_t, list)->value) > 0);
+        } while (next && cmp_element_t_val(list, next) > 0);
         list->next = prev;
     } else {
         do {
             len++;
             list = next;
             next = list->next;
-        } while (next &&
-                 strcmp(container_of(list, element_t, list)->value,
-                        container_of(next, element_t, list)->value) <= 0);
+        } while (next && cmp_element_t_val(list, next) <= 0);
         list->next = NULL;
     }
     head->prev = NULL;
