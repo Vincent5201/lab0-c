@@ -1,7 +1,8 @@
-declare -a traces=("1000" "10000" "50000" "100000" "500000")
+declare -a traces=("1000" "10000" "100000" "500000")
 for i in "${traces[@]}"
 do
-    perf stat --repeat 10 -o traces/compare_sort/k_sort/"$i"_report \
+    perf stat --repeat 100 -o traces/compare_sort/h_sort/"$i"_report \
     -e branches,cache-misses,cycles,instructions,context-switches \
-    ./qtest -v 3 -f traces/compare_sort/k_sort/"$i".cmd
+    ./qtest -v 3 -f traces/compare_sort/h_sort/"$i".cmd
 done
+# sudo sysctl -w kernel.perf_event_paranoid=-1

@@ -172,7 +172,7 @@ bool q_delete_dup(struct list_head *head)
 }
 
 /* Connect two list_heads. */
-void inline q_connect(struct list_head *first, struct list_head *second)
+static void inline q_connect(struct list_head *first, struct list_head *second)
 {
     first->next = second;
     second->prev = first;
@@ -364,9 +364,9 @@ static struct list_head *k_merge(struct list_head *a, struct list_head *b)
     return head;
 }
 
-static void build_prev_link(struct list_head *head,
-                            struct list_head *tail,
-                            struct list_head *list)
+static void inline build_prev_link(struct list_head *head,
+                                   struct list_head *tail,
+                                   struct list_head *list)
 {
     tail->next = list;
     do {
@@ -514,6 +514,7 @@ void h_sort(struct list_head *head)
     pending = lists;
     lists = lists->next;
     pending->next = NULL;
+    struct list_head *tail = pending;
     int tail_count = 1, run_count = 0;
     do {
         /* take one node */
@@ -534,25 +535,31 @@ void h_sort(struct list_head *head)
             pending = lists;
             lists = lists->next;
             pending->next = NULL;
+            tail = pending;
             tail_count = 1;
         } else {
             /* add to tail */
             struct list_head *tmp = lists;
             lists = lists->next;
             tail_count++;
-            if (cmp_element_t_val(tmp, pending) < 0) {
-                tmp->next = pending;
-                tmp->prev = pending->prev;
-                pending->prev = tmp;
-                pending = tmp;
+            if (unlikely(cmp_element_t_val(tmp, tail) >= 0)) {
+                tail->next = tmp;
+                tail = tmp;
+                tail->next = NULL;
             } else {
-                struct list_head *pos = pending->next, *last_pos = pending;
+                struct list_head *pos = pending, *last_pos = NULL;
                 while (pos && cmp_element_t_val(pos, tmp) < 0) {
                     last_pos = pos;
                     pos = pos->next;
                 }
-                last_pos->next = tmp;
-                tmp->next = pos;
+                if (likely(last_pos)) {
+                    last_pos->next = tmp;
+                    tmp->next = pos;
+                } else {
+                    tmp->next = pending;
+                    tmp->prev = pending->prev;
+                    pending = tmp;
+                }
             }
         }
     } while (lists);

@@ -1,5 +1,5 @@
 option select_sort 2
 new
-it RAND 50000
+it RAND 1000
 sort
 free

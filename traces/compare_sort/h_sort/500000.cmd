@@ -1,4 +1,4 @@
-option select_sort 3
+option select_sort 2
 new
 it RAND 500000
 sort
