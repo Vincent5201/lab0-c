@@ -1,13 +1,16 @@
-# started on Sun Jul 28 15:48:07 2024
+# started on Mon Jul 29 15:45:50 2024
 
 
  Performance counter stats for './qtest -v 3 -f traces/compare_sort/t_sort/100000.cmd' (100 runs):
 
-         6440,0494      branches                                                                ( +-  0.04% )
-          362,1628      cache-misses                                                            ( +-  0.38% )
-       3,9510,4882      cycles                                                                  ( +-  0.16% )
-       4,4628,4431      instructions                     #    1.13  insn per cycle              ( +-  0.02% )
-                 1      context-switches                                                        ( +-  8.41% )
+         6446,4434      branches                         #  511.044 M/sec                       ( +-  0.04% )
+          356,3776      cache-misses                                                            ( +-  0.42% )
+       3,9687,1931      cycles                           #    3.146 GHz                         ( +-  0.17% )
+       4,4656,0051      instructions                     #    1.13  insn per cycle              ( +-  0.03% )
+                 0      context-switches                 #    0.000 /sec                      
+            126.14 msec cpu-clock                        #    0.997 CPUs utilized               ( +-  0.21% )
+                 0      dummy                            #    0.000 /sec                      
+          163,5357      branch-misses                    #    2.54% of all branches             ( +-  0.07% )
 
-          0.126475 +- 0.000231 seconds time elapsed  ( +-  0.18% )
+          0.126499 +- 0.000267 seconds time elapsed  ( +-  0.21% )
 
