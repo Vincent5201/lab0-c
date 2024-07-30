@@ -157,7 +157,7 @@ struct list_head *i_sort(struct list_head *head)
     }
     return head;
 }
-
+/* try to improve h_sort */
 void h_sort(struct list_head *head)
 {
     if (!head || list_empty(head) || list_is_singular(head))
@@ -186,6 +186,105 @@ void h_sort(struct list_head *head)
     if (add)
         size++;
     /* put 1 node */
+    struct list_head *lists = head->next;
+    struct list_head *pending = lists;
+    struct list_head *tail = pending;
+    head->prev->next = NULL;
+    lists->prev = NULL;
+    lists = lists->next;
+    pending->next = NULL;
+    int tail_count = 1, run_count = 0;
+    do {
+        /* take nodes */
+        while (lists && tail_count < size) {
+            tail_count++;
+            if (cmp_element_t_val(lists, tail) >= 0) {
+                tail->next = lists;
+                tail = lists;
+                lists = lists->next;
+                tail->next = NULL;
+            } else {
+                struct list_head *pos = pending, *last_pos = NULL;
+                while (pos && cmp_element_t_val(pos, lists) < 0) {
+                    last_pos = pos;
+                    pos = pos->next;
+                }
+                if (last_pos) {
+                    last_pos->next = lists;
+                    lists = lists->next;
+                    last_pos->next->next = pos;
+                } else {
+                    struct list_head *tmp = lists;
+                    lists = lists->next;
+                    tmp->next = pending;
+                    tmp->prev = pending->prev;
+                    pending = tmp;
+                }
+            }
+        }
+        /* merge */
+        run_count++;
+        size_t bits;
+        struct list_head **run_tail = &pending;
+        for (bits = run_count; bits & 1; bits >>= 1)
+            run_tail = &(*run_tail)->prev;
+        if (likely(bits)) {
+            struct list_head *a = *run_tail, *b = a->prev;
+            a = k_merge(b, a);
+            a->prev = b->prev;
+            *run_tail = a;
+        }
+        if (lists) {
+            lists->prev = pending;
+            pending = lists;
+            lists = lists->next;
+            pending->next = NULL;
+            tail = pending;
+            tail_count = 1;
+        }
+    } while (lists);
+    /* merge all*/
+    lists = pending;
+    pending = pending->prev;
+    for (;;) {
+        struct list_head *next = pending->prev;
+        if (!next)
+            break;
+        lists = k_merge(pending, lists);
+        pending = next;
+    }
+    /* The final merge, rebuilding prev links */
+    k_merge_final(head, pending, lists);
+}
+/* old version of h_sort */
+/*
+void h_sort(struct list_head *head)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+    int size = q_size(head);
+    if (size < 64) {
+        struct list_head *node = head->next;
+        head->prev->next = NULL;
+        node = i_sort(node);
+        q_connect(head, node);
+        while (node->next && node->next != head) {
+            node->next->prev = node;
+            node = node->next;
+        }
+        q_connect(node, head);
+        return;
+    }
+
+    bool add = false;
+    while (size >= 64) {
+        if (size & 1)
+            add = true;
+        size = size >> 1;
+    }
+    if (add)
+        size++;
+
     struct list_head *lists = head->next, *pending = NULL;
     head->prev->next = NULL;
     lists->prev = pending;
@@ -195,9 +294,7 @@ void h_sort(struct list_head *head)
     struct list_head *tail = pending;
     int tail_count = 1, run_count = 0;
     do {
-        /* take one node */
         if (unlikely(tail_count == size)) {
-            /* merge */
             run_count++;
             size_t bits;
             struct list_head **run_tail = &pending;
@@ -216,7 +313,7 @@ void h_sort(struct list_head *head)
             tail = pending;
             tail_count = 1;
         } else {
-            /* add to tail */
+
             struct list_head *tmp = lists;
             lists = lists->next;
             tail_count++;
@@ -241,7 +338,6 @@ void h_sort(struct list_head *head)
             }
         }
     } while (lists);
-    /* merge all*/
     lists = pending;
     pending = pending->prev;
     for (;;) {
@@ -251,10 +347,9 @@ void h_sort(struct list_head *head)
         lists = k_merge(pending, lists);
         pending = next;
     }
-    /* The final merge, rebuilding prev links */
     k_merge_final(head, pending, lists);
-
 }
+*/
 
 static inline size_t run_size(struct list_head *head)
 {
