@@ -45,6 +45,8 @@ extern int show_entropy;
 #include "console.h"
 #include "queue.h"
 #include "report.h"
+#include "shuffle.h"
+#include "sorts.h"
 
 /* Settable parameters */
 
@@ -899,8 +901,6 @@ static bool do_merge(int argc, char *argv[])
     q_show(3);
     return ok && !error_check();
 }
-
-void q_shuffle(struct list_head *head);
 
 static bool do_shuffle(int argc, char *argv[])
 {
