@@ -326,6 +326,45 @@ int q_descend(struct list_head *head)
  * order */
 int q_merge(struct list_head *head, bool descend)
 {
-    // https://leetcode.com/problems/merge-k-sorted-lists/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+    if (list_is_singular(head))
+        return q_size(list_first_entry(head, queue_contex_t, chain)->q);
+
+    struct list_head *l = list_first_entry(head, queue_contex_t, chain)->q;
+    struct list_head *l1, *l2, *node;
+    queue_contex_t *qt = list_last_entry(head, queue_contex_t, chain);
+    while (qt->q != l) {
+        LIST_HEAD(head2);
+        INIT_LIST_HEAD(&head2);
+        struct list_head *l1_p, *l2_p;
+        l1 = l->next;
+        l1_p = l->prev;
+        l2 = qt->q->next;
+        l2_p = qt->q->prev;
+        while (l1 && l2) {
+            if (descend ^
+                (strcmp(list_entry(l1, element_t, list)->value,
+                        list_entry(l2, element_t, list)->value) > 0)) {
+                node = l2;
+                l2 = l2->next;
+            } else {
+                node = l1;
+                l1 = l1->next;
+            }
+            list_add_tail(node, &head2);
+        }
+        if (l1) {
+            q_connect((&head2)->prev, l1);
+            q_connect(l1_p, &head2);
+        } else if (l2) {
+            q_connect((&head2)->prev, l2);
+            q_connect(l2_p, &head2);
+        }
+        q_connect(l, (&head2)->next);
+        q_connect((&head2)->prev, l);
+        qt->q = NULL;
+        qt = list_entry(qt->chain.prev, queue_contex_t, chain);
+    }
+    return q_size(l);
 }
