@@ -337,11 +337,10 @@ int q_merge(struct list_head *head, bool descend)
     while (qt->q != l) {
         LIST_HEAD(head2);
         INIT_LIST_HEAD(&head2);
-        struct list_head *l1_p, *l2_p;
         l1 = l->next;
-        l1_p = l->prev;
         l2 = qt->q->next;
-        l2_p = qt->q->prev;
+        l->prev->next = NULL;
+        qt->q->prev->next = NULL;
         while (l1 && l2) {
             if (descend ^
                 (strcmp(list_entry(l1, element_t, list)->value,
@@ -356,15 +355,16 @@ int q_merge(struct list_head *head, bool descend)
         }
         if (l1) {
             q_connect((&head2)->prev, l1);
-            q_connect(l1_p, &head2);
+            q_connect(l->prev, &head2);
         } else if (l2) {
             q_connect((&head2)->prev, l2);
-            q_connect(l2_p, &head2);
+            q_connect(qt->q->prev, &head2);
         }
         q_connect(l, (&head2)->next);
         q_connect((&head2)->prev, l);
         qt->q = NULL;
-        qt = list_entry(qt->chain.prev, queue_contex_t, chain);
+        list_del_init(&qt->chain);
+        qt = list_last_entry(head, queue_contex_t, chain);
     }
     return q_size(l);
 }
