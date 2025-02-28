@@ -40,19 +40,27 @@ void q_free(struct list_head *head)
     free(head);
 }
 
+element_t *q_new_element(char *s)
+{
+    element_t *e = malloc(sizeof(element_t));
+    if (!e)
+        return NULL;
+    e->value = strdup(s);
+    if (!e->value) {
+        free(e);
+        return NULL;
+    }
+    return e;
+}
+
 /* Insert an element at head of queue */
 bool q_insert_head(struct list_head *head, char *s)
 {
     if (!head)
         return false;
-    element_t *e = malloc(sizeof(element_t));
+    element_t *e = q_new_element(s);
     if (!e)
         return false;
-    e->value = strdup(s);
-    if (!e->value) {
-        free(e);
-        return false;
-    }
     list_add(&e->list, head);
     return true;
 }
@@ -62,14 +70,9 @@ bool q_insert_tail(struct list_head *head, char *s)
 {
     if (!head)
         return false;
-    element_t *e = malloc(sizeof(element_t));
+    element_t *e = q_new_element(s);
     if (!e)
         return false;
-    e->value = strdup(s);
-    if (!e->value) {
-        free(e);
-        return false;
-    }
     list_add_tail(&e->list, head);
     return true;
 }
@@ -187,6 +190,8 @@ void q_reverseK(struct list_head *head, int k)
         return;
     struct list_head *last = head, *r_head = head->next, *r_tail = head->next;
     size_t count = 1;
+    LIST_HEAD(head2);
+    INIT_LIST_HEAD(&head2);
     while (r_head != head) {
         while (r_tail != head && count < k) {
             r_tail = r_tail->next;
@@ -194,54 +199,28 @@ void q_reverseK(struct list_head *head, int k)
         }
         if (count < k)
             break;
-        r_head->prev = NULL;
-        r_head = r_tail;
         r_tail = r_tail->next;
-        while (r_head->prev) {
-            last->next = r_head;
-            r_head = r_head->prev;
-            last->next->prev = last;
-            last = last->next;
-        }
-        q_connect(last, r_head);
-        q_connect(r_head, r_tail);
-        last = r_head;
+        q_connect(&head2, r_head);
+        q_connect(r_tail->prev, &head2);
+        q_reverse(&head2);
+        q_connect(last, (&head2)->next);
+        q_connect((&head2)->prev, r_tail);
+        last = r_tail->prev;
         r_head = r_tail;
         count = 1;
     }
 }
 
-/* Merge sort for a list at least two nodes */
-void q_mergesort(struct list_head *head, bool descend)
+/* Merge 2 lists to head1 and init head2 */
+void q_merge_2list(struct list_head *head1,
+                   struct list_head *head2,
+                   bool descend)
 {
-    if (list_is_singular(head))
-        return;
-    // Divide
-    struct list_head *fast = head->next->next, *slow = head->next;
-    head->prev->next = NULL;
-    while (fast->next && fast->next->next) {
-        fast = fast->next->next;
-        slow = slow->next;
-    }
-    if (fast->next)
-        fast = fast->next;
-
-    LIST_HEAD(head2);
-    INIT_LIST_HEAD(&head2);
-    q_connect(&head2, slow->next);
-    q_connect(fast, &head2);
-    q_connect(slow, head);
-
-    q_mergesort(head, descend);
-    q_mergesort(&head2, descend);
-
-    // Conquer
-    struct list_head *node, *list1 = head->next, *list2 = (&head2)->next;
-    struct list_head *list1_p = head->prev, *list2_p = (&head2)->prev;
-    list1_p->next = NULL;
-    list2_p->next = NULL;
-    INIT_LIST_HEAD(head);
-    INIT_LIST_HEAD(&head2);
+    struct list_head *node, *list1 = head1->next, *list2 = head2->next;
+    head1->prev->next = NULL;
+    head2->next->prev = NULL;
+    LIST_HEAD(tmp);
+    INIT_LIST_HEAD(&tmp);
     while (list1 && list2) {
         if (descend ^ (strcmp(list_entry(list1, element_t, list)->value,
                               list_entry(list2, element_t, list)->value) > 0)) {
@@ -251,15 +230,43 @@ void q_mergesort(struct list_head *head, bool descend)
             node = list1;
             list1 = list1->next;
         }
-        list_add_tail(node, head);
+        list_add_tail(node, &tmp);
     }
     if (list1) {
-        q_connect(head->prev, list1);
-        q_connect(list1_p, head);
+        q_connect((&tmp)->prev, list1);
+        q_connect(head1->prev, &tmp);
     } else if (list2) {
-        q_connect(head->prev, list2);
-        q_connect(list2_p, head);
+        q_connect((&tmp)->prev, list2);
+        q_connect(head2->prev, &tmp);
     }
+    INIT_LIST_HEAD(head1);
+    INIT_LIST_HEAD(head2);
+    list_splice_tail(&tmp, head1);
+}
+
+/* Merge sort for a list at least two nodes */
+void q_mergesort(struct list_head *head, bool descend)
+{
+    if (list_is_singular(head))
+        return;
+    // Divide
+    struct list_head *nt = head->next, *pv = head->prev;
+    while (nt != pv && nt->prev != pv) {
+        nt = nt->next;
+        pv = pv->prev;
+    }
+
+    LIST_HEAD(head2);
+    INIT_LIST_HEAD(&head2);
+    q_connect(&head2, pv->next);
+    q_connect(head->prev, &head2);
+    q_connect(pv, head);
+
+    q_mergesort(head, descend);
+    q_mergesort(&head2, descend);
+
+    // Conquer
+    q_merge_2list(head, &head2, descend);
 }
 
 /* Sort elements of queue in ascending/descending order */
@@ -332,36 +339,9 @@ int q_merge(struct list_head *head, bool descend)
         return q_size(list_first_entry(head, queue_contex_t, chain)->q);
 
     struct list_head *l = list_first_entry(head, queue_contex_t, chain)->q;
-    struct list_head *l1, *l2, *node;
     queue_contex_t *qt = list_last_entry(head, queue_contex_t, chain);
     while (qt->q != l) {
-        LIST_HEAD(head2);
-        INIT_LIST_HEAD(&head2);
-        l1 = l->next;
-        l2 = qt->q->next;
-        l->prev->next = NULL;
-        qt->q->prev->next = NULL;
-        while (l1 && l2) {
-            if (descend ^
-                (strcmp(list_entry(l1, element_t, list)->value,
-                        list_entry(l2, element_t, list)->value) > 0)) {
-                node = l2;
-                l2 = l2->next;
-            } else {
-                node = l1;
-                l1 = l1->next;
-            }
-            list_add_tail(node, &head2);
-        }
-        if (l1) {
-            q_connect((&head2)->prev, l1);
-            q_connect(l->prev, &head2);
-        } else if (l2) {
-            q_connect((&head2)->prev, l2);
-            q_connect(qt->q->prev, &head2);
-        }
-        q_connect(l, (&head2)->next);
-        q_connect((&head2)->prev, l);
+        q_merge_2list(l, qt->q, descend);
         qt->q = NULL;
         list_del_init(&qt->chain);
         qt = list_last_entry(head, queue_contex_t, chain);
