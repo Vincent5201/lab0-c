@@ -218,7 +218,7 @@ void q_merge_2list(struct list_head *head1,
 {
     struct list_head *node, *list1 = head1->next, *list2 = head2->next;
     head1->prev->next = NULL;
-    head2->next->prev = NULL;
+    head2->prev->next = NULL;
     LIST_HEAD(tmp);
     INIT_LIST_HEAD(&tmp);
     while (list1 && list2) {
