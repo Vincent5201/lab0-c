@@ -106,7 +106,7 @@ int q_size(struct list_head *head)
 {
     if (!head || list_empty(head))
         return 0;
-    size_t count = 0;
+    int count = 0;
     struct list_head *node;
     list_for_each (node, head)
         count++;
@@ -133,13 +133,19 @@ bool q_delete_dup(struct list_head *head)
 {
     if (!head || list_empty(head))
         return false;
-    element_t *entry, *safe, *del;
+    if (list_is_singular(head))
+        return true;
+    element_t *entry, *safe;
+    bool dup = false;
     list_for_each_entry_safe (entry, safe, head, list) {
-        while (&safe->list != head && !strcmp(entry->value, safe->value)) {
-            del = safe;
-            safe = list_entry(safe->list.next, element_t, list);
-            list_del(&del->list);
-            q_release_element(del);
+        if (&safe->list != head && !strcmp(entry->value, safe->value)) {
+            list_del(&entry->list);
+            q_release_element(entry);
+            dup = true;
+        } else if (dup) {
+            list_del(&entry->list);
+            q_release_element(entry);
+            dup = false;
         }
     }
     return true;
@@ -171,16 +177,9 @@ void q_reverse(struct list_head *head)
 {
     if (!head || list_empty(head) || list_is_singular(head))
         return;
-    struct list_head *tail = head->prev, *last = head;
-    head->next->prev = NULL;
-    while (tail->prev) {
-        last->next = tail;
-        tail = tail->prev;
-        last->next->prev = last;
-        last = last->next;
-    }
-    q_connect(last, tail);
-    q_connect(tail, head);
+    struct list_head *node, *safe;
+    list_for_each_safe (node, safe, head)
+        list_move(node, head);
 }
 
 /* Reverse the nodes of the list k at a time */
@@ -189,7 +188,7 @@ void q_reverseK(struct list_head *head, int k)
     if (!head || list_empty(head) || list_is_singular(head))
         return;
     struct list_head *last = head, *r_head = head->next, *r_tail = head->next;
-    size_t count = 1;
+    int count = 1;
     LIST_HEAD(head2);
     INIT_LIST_HEAD(&head2);
     while (r_head != head) {
@@ -211,37 +210,24 @@ void q_reverseK(struct list_head *head, int k)
     }
 }
 
-/* Merge 2 lists to head1 and init head2 */
+/* Merge 2 lists to head1 */
 void q_merge_2list(struct list_head *head1,
                    struct list_head *head2,
                    bool descend)
 {
-    struct list_head *node, *list1 = head1->next, *list2 = head2->next;
-    head1->prev->next = NULL;
-    head2->prev->next = NULL;
     LIST_HEAD(tmp);
     INIT_LIST_HEAD(&tmp);
-    while (list1 && list2) {
-        if (descend ^ (strcmp(list_entry(list1, element_t, list)->value,
-                              list_entry(list2, element_t, list)->value) > 0)) {
-            node = list2;
-            list2 = list2->next;
+    while (!list_empty(head1) && !list_empty(head2)) {
+        if (descend ^
+            (strcmp(list_first_entry(head1, element_t, list)->value,
+                    list_first_entry(head2, element_t, list)->value) > 0)) {
+            list_move_tail(head2->next, &tmp);
         } else {
-            node = list1;
-            list1 = list1->next;
+            list_move_tail(head1->next, &tmp);
         }
-        list_add_tail(node, &tmp);
     }
-    if (list1) {
-        q_connect((&tmp)->prev, list1);
-        q_connect(head1->prev, &tmp);
-    } else if (list2) {
-        q_connect((&tmp)->prev, list2);
-        q_connect(head2->prev, &tmp);
-    }
-    INIT_LIST_HEAD(head1);
-    INIT_LIST_HEAD(head2);
-    list_splice_tail(&tmp, head1);
+    list_splice(&tmp, head1);
+    list_splice_tail(head2, head1);
 }
 
 /* Merge sort for a list at least two nodes */
@@ -288,7 +274,7 @@ int q_ascend(struct list_head *head)
     char const *bound = list_last_entry(head, element_t, list)->value;
     struct list_head *node = head->prev->prev;
     element_t *e;
-    size_t count = 1;
+    int count = 1;
     while (node != head) {
         e = list_entry(node, element_t, list);
         node = node->prev;
@@ -314,7 +300,7 @@ int q_descend(struct list_head *head)
     char const *bound = list_last_entry(head, element_t, list)->value;
     struct list_head *node = head->prev->prev;
     element_t *e;
-    size_t count = 1;
+    int count = 1;
     while (node != head) {
         e = list_entry(node, element_t, list);
         node = node->prev;
