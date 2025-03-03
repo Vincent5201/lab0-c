@@ -83,8 +83,10 @@ element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
     if (!head || list_empty(head))
         return NULL;
     element_t *e = list_entry(head->next, element_t, list);
-    strncpy(sp, e->value, bufsize);
-    sp[bufsize - 1] = '\0';
+    if (sp) {
+        strncpy(sp, e->value, bufsize);
+        sp[bufsize - 1] = '\0';
+    }
     list_del(head->next);
     return e;
 }
@@ -95,8 +97,10 @@ element_t *q_remove_tail(struct list_head *head, char *sp, size_t bufsize)
     if (!head || list_empty(head))
         return NULL;
     element_t *e = list_entry(head->prev, element_t, list);
-    strncpy(sp, e->value, bufsize);
-    sp[bufsize - 1] = '\0';
+    if (sp) {
+        strncpy(sp, e->value, bufsize);
+        sp[bufsize - 1] = '\0';
+    }
     list_del(head->prev);
     return e;
 }
@@ -196,7 +200,7 @@ void q_reverseK(struct list_head *head, int k)
             r_tail = r_tail->next;
             count++;
         }
-        if (count < k)
+        if (count < k || r_tail == head)
             break;
         r_tail = r_tail->next;
         q_connect(&head2, r_head);
@@ -324,13 +328,12 @@ int q_merge(struct list_head *head, bool descend)
     if (list_is_singular(head))
         return q_size(list_first_entry(head, queue_contex_t, chain)->q);
 
-    struct list_head *l = list_first_entry(head, queue_contex_t, chain)->q;
-    queue_contex_t *qt = list_last_entry(head, queue_contex_t, chain);
-    while (qt->q != l) {
-        q_merge_2list(l, qt->q, descend);
-        qt->q = NULL;
-        list_del_init(&qt->chain);
-        qt = list_last_entry(head, queue_contex_t, chain);
+    queue_contex_t *qt0 = list_first_entry(head, queue_contex_t, chain);
+    queue_contex_t *qt1 = list_last_entry(head, queue_contex_t, chain);
+    while (qt0->q != qt1->q) {
+        q_merge_2list(qt0->q, qt1->q, descend);
+        INIT_LIST_HEAD(qt1->q);
+        qt1 = list_entry(qt1->chain.prev, queue_contex_t, chain);
     }
-    return q_size(l);
+    return q_size(qt0->q);
 }
