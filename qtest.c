@@ -43,6 +43,7 @@ extern int show_entropy;
  * solution code
  */
 #include "queue.h"
+#include "sorts.h"
 
 #include "console.h"
 #include "report.h"
@@ -74,6 +75,7 @@ static int fail_count = 0;
 static int string_length = MAXSTRING;
 
 static int descend = 0;
+static int sort_selection = 0;
 
 #define MIN_RANDSTR_LEN 5
 #define MAX_RANDSTR_LEN 10
@@ -613,7 +615,17 @@ bool do_sort(int argc, char *argv[])
                current->size, MAX_NODES);
 
     if (current && exception_setup(true))
-        q_sort(current->q, descend);
+        switch (sort_selection) {
+        case 0:
+            q_sort(current->q, descend);
+            break;
+        case 1:
+            list_sort(current->q, descend);
+            break;
+        default:
+            q_sort(current->q, descend);
+            break;
+        }
     exception_cancel();
     set_noallocate_mode(false);
 
@@ -1104,6 +1116,7 @@ static void console_init()
               "Number of times allow queue operations to return false", NULL);
     add_param("descend", &descend,
               "Sort and merge queue in ascending/descending order", NULL);
+    add_param("select_sort", &sort_selection, "Choose sorting strategy", NULL);
 }
 
 /* Signal handlers */
