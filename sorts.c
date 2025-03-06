@@ -6,8 +6,7 @@ struct list_head *merge(struct list_head *a, struct list_head *b, bool descend)
 {
     struct list_head *head = NULL, **tail = &head;
     for (;;) {
-        if (descend ^ (strcmp(list_entry(a, element_t, list)->value,
-                              list_entry(b, element_t, list)->value) <= 0)) {
+        if (cmp_xor_order(a, b, element_t, list, descend)) {
             *tail = a;
             tail = &a->next;
             a = a->next;
@@ -36,8 +35,7 @@ void merge_final(struct list_head *head,
     struct list_head *tail = head;
     for (;;) {
         /* if equal, take 'a' -- important for sort stability */
-        if (descend ^ (strcmp(list_entry(a, element_t, list)->value,
-                              list_entry(b, element_t, list)->value) <= 0)) {
+        if (cmp_xor_order(a, b, element_t, list, descend)) {
             tail->next = a;
             a->prev = tail;
             tail = a;
