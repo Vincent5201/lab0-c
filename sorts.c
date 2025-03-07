@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 
 #include "sorts.h"
@@ -69,6 +70,8 @@ void merge_final(struct list_head *head,
 
 void list_sort(struct list_head *head, bool descend)
 {
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
     struct list_head *list = head->next, *pending = NULL;
     size_t count = 0; /* Count of pending */
 
@@ -114,4 +117,165 @@ void list_sort(struct list_head *head, bool descend)
     }
     /* The final merge, rebuilding prev links */
     merge_final(head, pending, list, descend);
+}
+
+int get_minrun(size_t size)
+{
+    size_t add = size & 0x3F;
+    while (size >= 64)
+        size >>= 1;
+    return add ? size + 1 : size;
+}
+
+/* for a singly linked list without head */
+struct list_head *insert_sort(struct list_head *list,
+                              struct list_head *node,
+                              bool descend)
+{
+    if (!list && !node)
+        return NULL;
+    if (!list || !node)
+        return list ? list : node;
+    struct list_head *first = NULL, **p = &first;
+    while (list && cmp_xor_order(list, node, element_t, list, descend)) {
+        *p = list;
+        p = &list->next;
+        list = list->next;
+    }
+    *p = node;
+    node->next = list;
+    return first;
+}
+
+void insertion_sort(struct list_head *head, bool descend)
+{
+    head->prev->next = NULL;
+    struct list_head *list = head->next;
+    struct list_head *node = list->next;
+    struct list_head *lists = node->next;
+    list->next = NULL;
+    while (lists) {
+        node->next = NULL;
+        list = insert_sort(list, node, descend);
+        node = lists;
+        lists = lists->next;
+    }
+    list = insert_sort(list, node, descend);
+    head->next = list;
+    node = head;
+    while (list) {
+        list->prev = node;
+        node = list;
+        list = list->next;
+    }
+    node->next = head;
+    head->prev = node;
+}
+
+void find_runs(struct list_head *head, bool descend, int minrun)
+{
+    bool descend_now = false;
+    struct list_head *lists = head->next, *node = NULL;
+    struct list_head *runs_now = NULL, *runs_last = NULL;
+    int last_runs_len = 0;
+    head->prev->next = NULL;
+    INIT_LIST_HEAD(head);
+    LIST_HEAD(tmp);
+    while (lists) {
+        descend_now = cmp_xor_order(lists, node, element_t, list, descend_now)
+                          ? descend_now
+                          : (!descend_now);
+        runs_now = lists;
+        int runs_len = 1;
+        node = lists->next;
+        while (node &&
+               cmp_xor_order(lists, node, element_t, list, descend_now)) {
+            lists = node;
+            node = node->next;
+            runs_len++;
+        }
+        lists->next = NULL;
+        if (descend_now != descend) {
+            INIT_LIST_HEAD(&tmp);
+            lists->next = &tmp;
+            (&tmp)->prev = lists;
+            (&tmp)->next = runs_now;
+            runs_now->prev = &tmp;
+            q_reverse(&tmp);
+            runs_now = (&tmp)->next;
+            (&tmp)->prev->next = NULL;
+        }
+        lists = node;
+        if (runs_len >= minrun) {
+            runs_now->prev = head->prev;
+            head->prev = runs_now;
+        } else {
+            if (runs_last) {
+                last_runs_len += runs_len;
+                while (runs_now) {
+                    node = runs_now;
+                    runs_now = runs_now->next;
+                    node->next = NULL;
+                    runs_last = insert_sort(runs_last, node, descend);
+                }
+                if (last_runs_len >= minrun) {
+                    runs_last->prev = head->prev;
+                    head->prev = runs_last;
+                    runs_last = NULL;
+                    last_runs_len = 0;
+                }
+            } else {
+                runs_last = runs_now;
+                last_runs_len = runs_len;
+            }
+        }
+    }
+}
+
+int q_size_single(struct list_head *list)
+{
+    if (!list)
+        return 0;
+    int count = 0;
+    while (list) {
+        count++;
+        list = list->next;
+    }
+    return count;
+}
+
+void Timsort(struct list_head *head, bool descend)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+    size_t size = q_size(head);
+    if (size <= 64) {
+        insertion_sort(head, descend);
+        return;
+    }
+    printf("start findrun\n");
+    find_runs(head, descend, get_minrun(size));
+    printf("pass test\n");
+    /*
+    struct list_head *a = head->prev, *b = a->prev, *c, *lists;
+    if (b)
+        c = b->prev;
+    if (c)
+        lists = c->prev;
+
+    int size_a, size_b, size_c;
+    size_a = q_size_single(a);
+    size_b = q_size_single(b);
+    size_c = q_size_single(c);
+    if (c && size_b > size_a) {
+        head->prev = b;
+        b->prev = a;
+    }
+    while (c) {
+        // add c
+        // may need merge
+        // take new c
+    }
+    */
+
 }

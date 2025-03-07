@@ -622,6 +622,9 @@ bool do_sort(int argc, char *argv[])
         case 1:
             list_sort(current->q, descend);
             break;
+        case 2:
+            Timsort(current->q, descend);
+            break;
         default:
             q_sort(current->q, descend);
             break;
