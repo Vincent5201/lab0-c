@@ -75,9 +75,6 @@ void list_sort(struct list_head *head, bool descend)
     struct list_head *list = head->next, *pending = NULL;
     size_t count = 0; /* Count of pending */
 
-    if (list == head->prev) /* Zero or one elements */
-        return;
-
     /* Convert to a null-terminated singly-linked list. */
     head->prev->next = NULL;
     do {
@@ -127,15 +124,15 @@ int get_minrun(size_t size)
     return add ? size + 1 : size;
 }
 
-/* for a singly linked list without head */
+/* insert the node to a sorted singly linked list without head */
 struct list_head *insert_sort(struct list_head *list,
                               struct list_head *node,
                               bool descend)
 {
-    if (!list && !node)
-        return NULL;
-    if (!list || !node)
-        return list ? list : node;
+    if (!node)
+        return list;
+    if (!list)
+        return node;
     struct list_head *first = NULL, **p = &first;
     while (list && cmp_xor_order(list, node, element_t, list, descend)) {
         *p = list;
@@ -149,18 +146,20 @@ struct list_head *insert_sort(struct list_head *list,
 
 void insertion_sort(struct list_head *head, bool descend)
 {
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+
+    /* insert nodes one-by-one*/
+    struct list_head *node, *list = NULL, *lists = head->next;
     head->prev->next = NULL;
-    struct list_head *list = head->next;
-    struct list_head *node = list->next;
-    struct list_head *lists = node->next;
-    list->next = NULL;
     while (lists) {
-        node->next = NULL;
-        list = insert_sort(list, node, descend);
         node = lists;
         lists = lists->next;
+        node->next = NULL;
+        list = insert_sort(list, node, descend);
     }
-    list = insert_sort(list, node, descend);
+
+    /* rebuild link */
     head->next = list;
     node = head;
     while (list) {
@@ -175,19 +174,26 @@ void insertion_sort(struct list_head *head, bool descend)
 void find_runs(struct list_head *head, bool descend, int minrun)
 {
     bool descend_now = false;
-    struct list_head *lists = head->next, *node = NULL;
-    struct list_head *runs_now = NULL, *runs_last = NULL;
     int last_runs_len = 0;
+    struct list_head *lists = head->next, *runs_last = NULL;
     head->prev->next = NULL;
-    head->next = NULL;
-    head->prev = NULL;
+    head->next = head->prev = NULL;
+
     while (lists) {
-        node = lists->next;
+        int runs_len = 1;
+        struct list_head *node = lists->next, *runs_now = lists;
+        /* for last node */
+        if (!node) {
+            runs_now->prev = head->prev;
+            head->prev = runs_now;
+            break;
+        }
+
+        /* check subqueue is descend or not */
         descend_now = cmp_xor_order(lists, node, element_t, list, descend_now)
                           ? descend_now
                           : (!descend_now);
-        runs_now = lists;
-        int runs_len = 1;
+        /* cut off subqueue */
         while (node &&
                cmp_xor_order(lists, node, element_t, list, descend_now)) {
             lists = node;
@@ -195,23 +201,28 @@ void find_runs(struct list_head *head, bool descend, int minrun)
             runs_len++;
         }
         lists->next = NULL;
+        lists = node;
+
+        /* may need to reverse subqueue */
         if (descend_now != descend) {
             LIST_HEAD(tmp);
             INIT_LIST_HEAD(&tmp);
-            lists->next = &tmp;
-            (&tmp)->prev = lists;
-            (&tmp)->next = runs_now;
-            runs_now->prev = &tmp;
-            q_reverse(&tmp);
+            while (runs_now) {
+                node = runs_now;
+                runs_now = runs_now->next;
+                list_add(node, &tmp);
+            }
             runs_now = (&tmp)->next;
             (&tmp)->prev->next = NULL;
         }
-        lists = node;
+        /* check subqueue is long enough or not */
         if (runs_len >= minrun) {
+            /* add a new list */
             runs_now->prev = head->prev;
             head->prev = runs_now;
         } else {
             if (runs_last) {
+                /* combine with last short list */
                 last_runs_len += runs_len;
                 while (runs_now) {
                     node = runs_now;
@@ -220,12 +231,13 @@ void find_runs(struct list_head *head, bool descend, int minrun)
                     runs_last = insert_sort(runs_last, node, descend);
                 }
                 if (last_runs_len >= minrun) {
+                    /* add a new list */
                     runs_last->prev = head->prev;
                     head->prev = runs_last;
                     runs_last = NULL;
-                    last_runs_len = 0;
                 }
             } else {
+                /* save temporary */
                 runs_last = runs_now;
                 last_runs_len = runs_len;
             }
@@ -254,12 +266,17 @@ void Timsort(struct list_head *head, bool descend)
 {
     if (!head || list_empty(head) || list_is_singular(head))
         return;
+    /* if too short use insertion sort */
     size_t size = q_size(head);
     if (size <= 64) {
         insertion_sort(head, descend);
         return;
     }
+
+    /* generate runs */
     find_runs(head, descend, get_minrun(size));
+
+    /* initate list_sort() to merge runs */
     struct list_head *lists = head->prev, *pending = NULL, *list;
     size_t count = 0;
     do {
