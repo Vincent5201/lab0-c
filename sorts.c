@@ -179,15 +179,15 @@ void find_runs(struct list_head *head, bool descend, int minrun)
     struct list_head *runs_now = NULL, *runs_last = NULL;
     int last_runs_len = 0;
     head->prev->next = NULL;
-    INIT_LIST_HEAD(head);
-    LIST_HEAD(tmp);
+    head->next = NULL;
+    head->prev = NULL;
     while (lists) {
+        node = lists->next;
         descend_now = cmp_xor_order(lists, node, element_t, list, descend_now)
                           ? descend_now
                           : (!descend_now);
         runs_now = lists;
         int runs_len = 1;
-        node = lists->next;
         while (node &&
                cmp_xor_order(lists, node, element_t, list, descend_now)) {
             lists = node;
@@ -196,6 +196,7 @@ void find_runs(struct list_head *head, bool descend, int minrun)
         }
         lists->next = NULL;
         if (descend_now != descend) {
+            LIST_HEAD(tmp);
             INIT_LIST_HEAD(&tmp);
             lists->next = &tmp;
             (&tmp)->prev = lists;
@@ -230,6 +231,10 @@ void find_runs(struct list_head *head, bool descend, int minrun)
             }
         }
     }
+    if (runs_last) {
+        runs_last->prev = head->prev;
+        head->prev = runs_last;
+    }
 }
 
 int q_size_single(struct list_head *list)
@@ -237,9 +242,10 @@ int q_size_single(struct list_head *list)
     if (!list)
         return 0;
     int count = 0;
-    while (list) {
+    struct list_head *node = list;
+    while (node) {
         count++;
-        list = list->next;
+        node = node->next;
     }
     return count;
 }
@@ -253,29 +259,34 @@ void Timsort(struct list_head *head, bool descend)
         insertion_sort(head, descend);
         return;
     }
-    printf("start findrun\n");
     find_runs(head, descend, get_minrun(size));
-    printf("pass test\n");
-    /*
-    struct list_head *a = head->prev, *b = a->prev, *c, *lists;
-    if (b)
-        c = b->prev;
-    if (c)
-        lists = c->prev;
-
-    int size_a, size_b, size_c;
-    size_a = q_size_single(a);
-    size_b = q_size_single(b);
-    size_c = q_size_single(c);
-    if (c && size_b > size_a) {
-        head->prev = b;
-        b->prev = a;
+    struct list_head *lists = head->prev, *pending = NULL, *list;
+    size_t count = 0;
+    do {
+        size_t bits;
+        struct list_head **tail = &pending;
+        for (bits = count; bits & 1; bits >>= 1)
+            tail = &(*tail)->prev;
+        if (likely(bits)) {
+            struct list_head *a = *tail, *b = a->prev;
+            a = merge(b, a, descend);
+            a->prev = b->prev;
+            *tail = a;
+        }
+        list = lists;
+        lists = lists->prev;
+        list->prev = pending;
+        pending = list;
+        count++;
+    } while (lists);
+    list = pending;
+    pending = pending->prev;
+    for (;;) {
+        struct list_head *next = pending->prev;
+        if (!next)
+            break;
+        list = merge(pending, list, descend);
+        pending = next;
     }
-    while (c) {
-        // add c
-        // may need merge
-        // take new c
-    }
-    */
-
+    merge_final(head, pending, list, descend);
 }
