@@ -217,7 +217,6 @@ static void init_once(void)
 {
     init_dut();
     for (int i = 0; i < DUDECT_TESTS; i++) {
-        tt[i] = (t_context_t *) calloc(1, sizeof(t_context_t));
         t_init(tt[i]);
     }
 }
@@ -225,7 +224,9 @@ static void init_once(void)
 static bool test_const(char *text, int mode)
 {
     bool result = false;
-
+    for (int i = 0; i < DUDECT_TESTS; i++) {
+        tt[i] = (t_context_t *) calloc(1, sizeof(t_context_t));
+    }
     for (int cnt = 0; cnt < TEST_TRIES; ++cnt) {
         printf("Testing %s...(%d/%d)\n\n", text, cnt, TEST_TRIES);
         init_once();
