@@ -17,7 +17,4 @@ void merge_final(struct list_head *head,
 
 void list_sort(struct list_head *head, bool descend);
 
-void Timsort(struct list_head *head, bool descend);
-
-
-
+void hybrid_sort(struct list_head *head, bool descend);

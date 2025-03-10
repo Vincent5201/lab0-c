@@ -183,7 +183,7 @@ void find_runs(struct list_head *head, bool descend, int minrun)
         int runs_len = 1;
         struct list_head *node = lists->next, *runs_now = lists;
         /* for last node */
-        if (!node) {
+        if (unlikely(!node)) {
             runs_now->prev = head->prev;
             head->prev = runs_now;
             break;
@@ -216,7 +216,7 @@ void find_runs(struct list_head *head, bool descend, int minrun)
             (&tmp)->prev->next = NULL;
         }
         /* check subqueue is long enough or not */
-        if (runs_len >= minrun) {
+        if (unlikely(runs_len >= minrun)) {
             /* add a new list */
             runs_now->prev = head->prev;
             head->prev = runs_now;
@@ -243,7 +243,7 @@ void find_runs(struct list_head *head, bool descend, int minrun)
             }
         }
     }
-    if (runs_last) {
+    if (likely(runs_last)) {
         runs_last->prev = head->prev;
         head->prev = runs_last;
     }
@@ -262,7 +262,7 @@ int q_size_single(struct list_head *list)
     return count;
 }
 
-void Timsort(struct list_head *head, bool descend)
+void hybrid_sort(struct list_head *head, bool descend)
 {
     if (!head || list_empty(head) || list_is_singular(head))
         return;
