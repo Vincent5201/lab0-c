@@ -183,7 +183,7 @@ void find_runs(struct list_head *head, bool descend, int minrun)
         int runs_len = 1;
         struct list_head *node = lists->next, *runs_now = lists;
         /* for last node */
-        if (unlikely(!node)) {
+        if (!node) {
             runs_now->prev = head->prev;
             head->prev = runs_now;
             break;
@@ -216,7 +216,7 @@ void find_runs(struct list_head *head, bool descend, int minrun)
             (&tmp)->prev->next = NULL;
         }
         /* check subqueue is long enough or not */
-        if (unlikely(runs_len >= minrun)) {
+        if (runs_len >= minrun) {
             /* add a new list */
             runs_now->prev = head->prev;
             head->prev = runs_now;
@@ -243,7 +243,7 @@ void find_runs(struct list_head *head, bool descend, int minrun)
             }
         }
     }
-    if (likely(runs_last)) {
+    if (runs_last) {
         runs_last->prev = head->prev;
         head->prev = runs_last;
     }
@@ -296,6 +296,66 @@ void hybrid_sort(struct list_head *head, bool descend)
         pending = list;
         count++;
     } while (lists);
+    list = pending;
+    pending = pending->prev;
+    for (;;) {
+        struct list_head *next = pending->prev;
+        if (!next)
+            break;
+        list = merge(pending, list, descend);
+        pending = next;
+    }
+    merge_final(head, pending, list, descend);
+}
+
+struct list_head *get_runs(struct list_head *head, bool descend, int minrun)
+{
+    int run_len = 1;
+    struct list_head *node, *lists = head->next, *run = NULL;
+    head->next = NULL;
+    while (lists && run_len < minrun) {
+        node = lists;
+        lists = lists->next;
+        node->next = NULL;
+        run = insert_sort(run, node, descend);
+        run_len++;
+    }
+    head->next = lists;
+    return run;
+}
+
+void hybrid2_sort(struct list_head *head, bool descend)
+{
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
+    /* if too short use insertion sort */
+    size_t size = q_size(head);
+    if (size <= 64) {
+        insertion_sort(head, descend);
+        return;
+    }
+
+    /* initate list_sort() to merge runs */
+    int minrun = get_minrun(size);
+    struct list_head *pending = NULL, *list;
+    head->prev->next = NULL;
+    size_t count = 0;
+    do {
+        size_t bits;
+        struct list_head **tail = &pending;
+        for (bits = count; bits & 1; bits >>= 1)
+            tail = &(*tail)->prev;
+        if (likely(bits)) {
+            struct list_head *a = *tail, *b = a->prev;
+            a = merge(b, a, descend);
+            a->prev = b->prev;
+            *tail = a;
+        }
+        list = get_runs(head, descend, minrun);
+        list->prev = pending;
+        pending = list;
+        count++;
+    } while (head->next);
     list = pending;
     pending = pending->prev;
     for (;;) {
