@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 COMMIT_MSG_FILE="$1"
 
 # If the commit message file already contains non-comment lines, do nothing.
 if grep -qE '^[^[:space:]#]' "$COMMIT_MSG_FILE"; then
-    exit 0
+  exit 0
 fi
 
 # Gather a list of staged (changed) files.
@@ -49,8 +49,8 @@ EOF
 # Prompt the user about aborting the commit.
 read -rp "Do you want to abort this commit? (y/N): " answer
 if [[ "$answer" =~ ^[Yy]$ ]]; then
-    echo "Commit aborted by user." >&2
-    exit 1
+  echo "Commit aborted by user." >&2
+  exit 1
 fi
 
 exit 0
