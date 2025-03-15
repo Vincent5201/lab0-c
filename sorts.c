@@ -310,16 +310,45 @@ void hybrid_sort(struct list_head *head, bool descend)
 
 struct list_head *get_runs(struct list_head *head, bool descend, int minrun)
 {
-    int run_len = 1;
-    struct list_head *node, *lists = head->next, *run = NULL;
-    head->next = NULL;
+    bool descend_now = false;
+    int run_len = 0;
+    struct list_head *lists = head->next, *node = head->next->next;
+    struct list_head *run = lists;
+    head->prev->next = NULL;
+    head->next = head->prev = NULL;
+    if (!node)
+        return run;
+
+    descend_now = cmp_xor_order(lists, node, element_t, list, descend_now)
+                      ? descend_now
+                      : (!descend_now);
+    while (node && cmp_xor_order(lists, node, element_t, list, descend_now)) {
+        lists = node;
+        node = node->next;
+        run_len++;
+    }
+    lists->next = NULL;
+    lists = node;
+
+    if (descend_now != descend) {
+        LIST_HEAD(tmp);
+        INIT_LIST_HEAD(&tmp);
+        while (run) {
+            node = run;
+            run = run->next;
+            list_add(node, &tmp);
+        }
+        run = (&tmp)->next;
+        (&tmp)->prev->next = NULL;
+    }
+
     while (lists && run_len < minrun) {
         node = lists;
         lists = lists->next;
-        node->next = NULL;
         run = insert_sort(run, node, descend);
-        run_len++;
+        run_len += 1;
     }
+
     head->next = lists;
     return run;
 }
