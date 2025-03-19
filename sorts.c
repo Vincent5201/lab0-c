@@ -116,7 +116,7 @@ void list_sort(struct list_head *head, bool descend)
     merge_final(head, pending, list, descend);
 }
 
-int get_minrun(size_t size)
+static int get_minrun(size_t size)
 {
     size_t add = size & 0x3F;
     while (size >= 64)
@@ -142,6 +142,25 @@ struct list_head *insert_sort(struct list_head *list,
     *p = node;
     node->next = list;
     return first;
+}
+
+/* insert a node to a sorted linked list from specific node */
+struct list_head *insert_sort_behind(struct list_head *node,
+                                     struct list_head *behind,
+                                     bool descend)
+{
+    struct list_head *pos = NULL, **p = &pos, *tmp;
+    tmp = behind->next;
+    behind->next = pos;
+    behind = tmp;
+    while (behind && cmp_xor_order(behind, node, element_t, list, descend)) {
+        *p = behind;
+        p = &behind->next;
+        behind = behind->next;
+    }
+    *p = node;
+    node->next = behind;
+    return node;
 }
 
 void insertion_sort(struct list_head *head, bool descend)
@@ -171,95 +190,104 @@ void insertion_sort(struct list_head *head, bool descend)
     head->prev = node;
 }
 
-void find_runs(struct list_head *head, bool descend, int minrun)
+static void find_runs(struct list_head *head, bool descend, int minrun)
 {
-    bool descend_now = false;
     int last_runs_len = 0;
-    struct list_head *lists = head->next, *runs_last = NULL;
+    bool descend_now = false;
+    struct list_head *lists = head->next, runs_last;
+    (&runs_last)->next = (&runs_last)->prev = NULL;
     head->prev->next = NULL;
+    head->next->prev = NULL;
     head->next = head->prev = NULL;
-
     while (lists) {
-        int runs_len = 1;
-        struct list_head *node = lists->next, *runs_now = lists;
         /* for last node */
-        if (unlikely(!node)) {
-            runs_now->prev = head->prev;
-            head->prev = runs_now;
+        if (unlikely(!(lists->next))) {
+            lists->prev = head->prev;
+            head->prev = lists;
             break;
         }
-
-        /* check subqueue is descend or not */
-        descend_now = cmp_xor_order(lists, node, element_t, list, descend_now)
+        int runs_len = 1;
+        struct list_head *node = lists, *runs_now = lists;
+        lists = lists->next;
+        descend_now = cmp_xor_order(node, lists, element_t, list, descend_now)
                           ? descend_now
                           : (!descend_now);
-        /* cut off subqueue */
-        while (node &&
-               cmp_xor_order(lists, node, element_t, list, descend_now)) {
-            lists = node;
-            node = node->next;
+        while (lists &&
+               cmp_xor_order(node, lists, element_t, list, descend_now)) {
+            node = lists;
+            lists = lists->next;
             runs_len++;
         }
-        lists->next = NULL;
-        lists = node;
-
-        /* may need to reverse subqueue */
-        if (descend_now != descend) {
-            LIST_HEAD(tmp);
-            INIT_LIST_HEAD(&tmp);
-            while (runs_now) {
-                node = runs_now;
-                runs_now = runs_now->next;
-                list_add(node, &tmp);
+        node->next = NULL;
+        runs_now->prev = NULL;
+        last_runs_len += runs_len;
+        if (!((&runs_last)->next)) {
+            (&runs_last)->next = runs_now;
+            if (descend != descend_now) {
+                runs_now->prev = (&runs_last);
+                (&runs_last)->prev = node;
+                node->next = (&runs_last);
+                q_reverse(&runs_last);
+                (&runs_last)->next->prev = NULL;
+                (&runs_last)->prev->next = NULL;
+                (&runs_last)->prev = NULL;
             }
-            runs_now = (&tmp)->next;
-            (&tmp)->prev->next = NULL;
-        }
-        /* check subqueue is long enough or not */
-        if (unlikely(runs_len >= minrun)) {
-            /* add a new list */
-            runs_now->prev = head->prev;
-            head->prev = runs_now;
         } else {
-            if (runs_last) {
-                /* combine with last short list */
-                last_runs_len += runs_len;
-                while (runs_now) {
+            struct list_head *behind = (&runs_last);
+            if (descend == descend_now) {
+                while (runs_now && behind->next) {
                     node = runs_now;
                     runs_now = runs_now->next;
                     node->next = NULL;
-                    runs_last = insert_sort(runs_last, node, descend);
+                    behind = insert_sort_behind(node, behind, descend);
                 }
-                if (last_runs_len >= minrun) {
-                    /* add a new list */
-                    runs_last->prev = head->prev;
-                    head->prev = runs_last;
-                    runs_last = NULL;
-                }
+                if (runs_now)
+                    behind->next = runs_now;
             } else {
-                /* save temporary */
-                runs_last = runs_now;
-                last_runs_len = runs_len;
+                runs_now = node;
+                while (runs_now && behind->next) {
+                    node = runs_now;
+                    runs_now = runs_now->prev;
+                    node->next = NULL;
+                    behind = insert_sort_behind(node, behind, descend);
+                }
+                while (runs_now) {
+                    node = runs_now;
+                    runs_now = runs_now->prev;
+                    node->next = NULL;
+                    behind->next = node;
+                    behind = node;
+                }
+                behind->next = NULL;
             }
         }
+        if (last_runs_len > minrun) {
+            (&runs_last)->next->prev = head->prev;
+            head->prev = (&runs_last)->next;
+            last_runs_len = 0;
+            (&runs_last)->next = (&runs_last)->prev = NULL;
+            // printf("add1\n");
+        }
     }
-    if (likely(runs_last)) {
-        runs_last->prev = head->prev;
-        head->prev = runs_last;
+    int tmp = 0;
+    lists = head->prev;
+    while (lists) {
+        tmp++;
+        lists = lists->prev;
     }
-}
-
-int q_size_single(struct list_head *list)
-{
-    if (!list)
-        return 0;
-    int count = 0;
-    struct list_head *node = list;
-    while (node) {
-        count++;
-        node = node->next;
+    // printf("endf%d\n", tmp);
+    if (likely((&runs_last)->next)) {
+        (&runs_last)->next->prev = head->prev;
+        head->prev = (&runs_last)->next;
+        // printf("add2\n");
     }
-    return count;
+    tmp = 0;
+    lists = head->prev;
+    while (lists) {
+        tmp++;
+        lists = lists->prev;
+    }
+    // printf("endf%d\n", tmp);
 }
 
 void hybrid_sort(struct list_head *head, bool descend)
@@ -295,7 +323,9 @@ void hybrid_sort(struct list_head *head, bool descend)
         list->prev = pending;
         pending = list;
         count++;
+        // printf("count%ld\n", count);
     } while (lists);
+    // printf("endm\n");
     list = pending;
     pending = pending->prev;
     for (;;) {
@@ -305,5 +335,38 @@ void hybrid_sort(struct list_head *head, bool descend)
         list = merge(pending, list, descend);
         pending = next;
     }
+    // printf("endmm\n");
     merge_final(head, pending, list, descend);
+}
+
+void qk_sort(struct list_head *head, bool descend)
+{
+    // printf("loopf %d\n", q_size(head));
+    struct list_head list_less, list_greater;
+    element_t *pivot, *item = NULL, *is = NULL;
+
+    if (list_empty(head) || list_is_singular(head))
+        return;
+
+    INIT_LIST_HEAD(&list_less);
+    INIT_LIST_HEAD(&list_greater);
+
+    pivot = list_first_entry(head, element_t, list);
+    list_del(&pivot->list);
+
+    list_for_each_entry_safe(item, is, head, list) {
+        if (cmp_xor_order(&item->list, &pivot->list, element_t, list,
+                          descend)) {
+            list_move_tail(&item->list, &list_less);
+        } else {
+            list_move_tail(&item->list, &list_greater);
+        }
+    }
+
+    qk_sort(&list_less, descend);
+    qk_sort(&list_greater, descend);
+    list_move_tail(&pivot->list, head);
+    list_splice(&list_less, head);
+    list_splice_tail(&list_greater, head);
+    // printf("loope %d\n", q_size(head));
 }
