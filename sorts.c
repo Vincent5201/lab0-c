@@ -149,17 +149,13 @@ struct list_head *insert_sort_behind(struct list_head *node,
                                      struct list_head *behind,
                                      bool descend)
 {
-    struct list_head *pos = NULL, **p = &pos, *tmp;
-    tmp = behind->next;
-    behind->next = pos;
-    behind = tmp;
-    while (behind && cmp_xor_order(behind, node, element_t, list, descend)) {
-        *p = behind;
-        p = &behind->next;
-        behind = behind->next;
+    struct list_head *tmp = behind->next;
+    while (tmp && cmp_xor_order(tmp, node, element_t, list, descend)) {
+        behind = tmp;
+        tmp = tmp->next;
     }
-    *p = node;
-    node->next = behind;
+    behind->next = node;
+    node->next = tmp;
     return node;
 }
 
