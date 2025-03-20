@@ -149,13 +149,13 @@ struct list_head *insert_sort_behind(struct list_head *node,
                                      struct list_head *behind,
                                      bool descend)
 {
-    struct list_head *tmp = behind->next;
-    while (tmp && cmp_xor_order(tmp, node, element_t, list, descend)) {
-        behind = tmp;
-        tmp = tmp->next;
+    struct list_head *after = behind->next, *before = behind;
+    while (after && cmp_xor_order(after, node, element_t, list, descend)) {
+        before = after;
+        after = after->next;
     }
-    behind->next = node;
-    node->next = tmp;
+    before->next = node;
+    node->next = after;
     return node;
 }
 
@@ -337,7 +337,6 @@ void hybrid_sort(struct list_head *head, bool descend)
 
 void qk_sort(struct list_head *head, bool descend)
 {
-    // printf("loopf %d\n", q_size(head));
     struct list_head list_less, list_greater;
     element_t *pivot, *item = NULL, *is = NULL;
 
@@ -346,7 +345,6 @@ void qk_sort(struct list_head *head, bool descend)
 
     INIT_LIST_HEAD(&list_less);
     INIT_LIST_HEAD(&list_greater);
-
     pivot = list_first_entry(head, element_t, list);
     list_del(&pivot->list);
 
@@ -361,8 +359,7 @@ void qk_sort(struct list_head *head, bool descend)
 
     qk_sort(&list_less, descend);
     qk_sort(&list_greater, descend);
-    list_move_tail(&pivot->list, head);
+    list_add(&pivot->list, head);
     list_splice(&list_less, head);
     list_splice_tail(&list_greater, head);
-    // printf("loope %d\n", q_size(head));
 }
